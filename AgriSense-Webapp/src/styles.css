@@ -1,0 +1,119 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: "Arial", sans-serif;
+    line-height: 1.6;
+    background-color: #1e1e2f;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    margin: 0;
+  }
+  
+  /* Navigation Bar */
+  nav {
+    background-color: #2d2d44;
+    display: flex;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 800px;
+  }
+  
+  nav a {
+    color: #8ecae6;
+    text-decoration: none;
+    font-size: 1.2rem;
+    margin: 0 10px;
+    padding: 5px 10px;
+    transition: color 0.3s ease, background-color 0.3s ease;
+    border-radius: 4px;
+  }
+  
+  nav a:hover {
+    background-color: #8ecae6;
+    color: #2d2d44;
+  }
+  
+  /* Main Container */
+  .container {
+    max-width: 800px;
+    width: 100%;
+    padding: 20px;
+    background-color: #2d2d44;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Dashboard Styling */
+  .dashboard h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 2rem;
+    color: #f4a261;
+  }
+  
+  .control-group {
+    margin-bottom: 15px;
+  }
+  
+  label {
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 5px;
+    color: #ffffff;
+  }
+  
+  input[type="number"] {
+    width: 100%;
+    padding: 8px;
+    font-size: 1rem;
+    border: 1px solid #8ecae6;
+    border-radius: 4px;
+    background-color: #1e1e2f;
+    color: #ffffff;
+  }
+  
+  input[type="number"]:focus {
+    outline: none;
+    border-color: #f4a261;
+  }
+  
+  /* Buttons */
+  button {
+    background-color: #8ecae6;
+    color: #2d2d44;
+    padding: 8px 12px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: #f4a261;
+    color: #ffffff;
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 600px) {
+    nav {
+      flex-direction: column;
+      align-items: center;
+    }
+  
+    nav a {
+      margin: 5px 0;
+    }
+  }
+  
