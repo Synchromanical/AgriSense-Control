@@ -4,7 +4,7 @@ const ControlPanel = () => {
   const [templateName, setTemplateName] = useState("Plant55");
 
   return (
-    <div>
+    <div className="content">
       <h2>Control Panel</h2>
       <div>
         <label>Template Name:</label>
