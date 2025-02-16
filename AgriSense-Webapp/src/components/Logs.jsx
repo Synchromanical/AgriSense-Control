@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  doc,
+  deleteDoc,
+  addDoc,
+  Timestamp
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 const Logs = () => {
@@ -8,63 +17,79 @@ const Logs = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const logsPerPage = 25;
   const fileInputRef = useRef(null);
 
+  const logsPerPage = 25;
+
+  // ----------------------------------------------------------------
+  // 1) REAL-TIME LISTENER: sensorData, ORDER ASC
+  // ----------------------------------------------------------------
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "sensorData"));
-        const logsData = [];
+    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const newLogs = [];
 
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          const timestampArray = data.timestamp; // Array of timestamps
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
 
-          // Push individual sensor readings as separate rows
-          const addLogEntry = (sensorType, values) => {
-            if (Array.isArray(values) && Array.isArray(timestampArray)) {
-              values.forEach((value, index) => {
-                if (timestampArray[index]) {
-                  logsData.push({
-                    // Temporary ID; will be reset after sorting
-                    id: logsData.length + 1,
-                    // Store the original Date for filtering
-                    time: new Date(timestampArray[index]),
-                    action: `Collected data of ${sensorType}: ${value}`,
-                  });
-                }
-              });
-            }
-          };
+        // Convert Firestore timestamp to JS Date
+        let timeObj;
+        if (data.timestamp && data.timestamp.toDate) {
+          // If it's a Firestore Timestamp
+          timeObj = data.timestamp.toDate();
+        } else if (data.timestamp) {
+          // If it's a plain date string or Date object
+          timeObj = new Date(data.timestamp);
+        } else {
+          // If no timestamp, fallback
+          timeObj = new Date(0);
+        }
 
-          addLogEntry("Temperature", data.temperature);
-          addLogEntry("Humidity", data.humidity);
-          addLogEntry("Soil Moisture", data.soilMoisture);
-          addLogEntry("Light", data.light);
+        // Format time as a string
+        const timeDisplay = timeObj.toLocaleString();
+
+        // For each sensor field, create a separate log line
+        // The user wants "Reading of Temperature: 21", etc.
+        // Adjust or remove any fields you don't want to display.
+        const sensorFields = [
+          { label: "Temperature", value: data.temperature },
+          { label: "Humidity", value: data.humidity },
+          { label: "Soil Moisture", value: data.soilMoisture },
+          { label: "Light", value: data.light },
+          { label: "Water Level", value: data.waterLevel },
+          { label: "Light State", value: data.lightState },
+        ];
+
+        sensorFields.forEach((field) => {
+          // Only create a log if there's a defined value
+          if (field.value !== undefined && field.value !== null) {
+            const actionString = `Reading of ${field.label}: ${field.value}`;
+            newLogs.push({
+              // We'll assign an integer ID later
+              time: timeObj,
+              timeDisplay,
+              action: actionString,
+            });
+          }
         });
+      });
 
-        // Sort logs by time in ascending order (earliest first)
-        logsData.sort((a, b) => a.time - b.time);
+      // Now newLogs is in ascending order by doc timestamp
+      // But we have multiple lines per doc
+      // Assign a simple integer ID from earliest to latest
+      newLogs.forEach((log, idx) => {
+        log.id = idx + 1;
+      });
 
-        // Create a new array with formatted time for display and keep the original Date in "originalTime"
-        const formattedLogs = logsData.map((log, index) => ({
-          ...log,
-          id: index + 1,
-          originalTime: log.time,
-          time: log.time.toLocaleString(),
-        }));
+      setLogs(newLogs);
+    });
 
-        setLogs(formattedLogs);
-      } catch (error) {
-        console.error("Error fetching logs:", error);
-      }
-    };
-
-    fetchLogs();
+    return () => unsub();
   }, []);
 
-  // Filter logs based on text search and time range
+  // ----------------------------------------------------------------
+  // 2) FILTERING: time range & text search
+  // ----------------------------------------------------------------
   const filteredLogs = logs.filter((log) => {
     // Text filter (by ID or Action)
     const textMatch =
@@ -72,49 +97,45 @@ const Logs = () => {
       log.id.toString().includes(searchTerm) ||
       log.action.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Time filter: if startTime/endTime is provided, convert to Date for comparison
+    // Time filter
     let timeMatch = true;
     if (startTime) {
       const startDate = new Date(startTime);
-      timeMatch = timeMatch && log.originalTime >= startDate;
+      timeMatch = timeMatch && log.time >= startDate;
     }
     if (endTime) {
       const endDate = new Date(endTime);
-      timeMatch = timeMatch && log.originalTime <= endDate;
+      timeMatch = timeMatch && log.time <= endDate;
     }
 
     return textMatch && timeMatch;
   });
 
-  // Reset current page to 1 when any search filter changes
+  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, startTime, endTime]);
 
-  // Pagination calculation based on filtered logs
+  // ----------------------------------------------------------------
+  // 3) PAGINATION
+  // ----------------------------------------------------------------
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
   const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);
   const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
 
-  // Handlers for pagination buttons
   const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage((prev) => prev + 1);
-    }
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
 
   const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage((prev) => prev - 1);
-    }
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
 
-  // Render page numbers for direct navigation
   const renderPageNumbers = () => {
-    const pageNumbers = [];
+    const pages = [];
     for (let i = 1; i <= totalPages; i++) {
-      pageNumbers.push(
+      pages.push(
         <button
           key={i}
           onClick={() => setCurrentPage(i)}
@@ -124,12 +145,20 @@ const Logs = () => {
         </button>
       );
     }
-    return pageNumbers;
+    return pages;
   };
 
-  // Export logs as a JSON file
+  // ----------------------------------------------------------------
+  // 4) IMPORT / EXPORT / CLEAR
+  // ----------------------------------------------------------------
+  // Export logs as JSON
   const handleExportLogs = () => {
-    const json = JSON.stringify(logs, null, 2);
+    const exportData = logs.map((log) => ({
+      id: log.id,
+      time: log.time?.toISOString() || null,
+      action: log.action,
+    }));
+    const json = JSON.stringify(exportData, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -141,16 +170,28 @@ const Logs = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Import logs from a JSON file
+  // Import logs from JSON
+  // For demonstration, we add them to Firestore as new docs
   const handleImportLogs = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const importedLogs = JSON.parse(event.target.result);
-        // Optionally, process the imported logs before updating state.
-        setLogs(importedLogs);
+        const imported = JSON.parse(event.target.result);
+        for (const item of imported) {
+          const time = item.time ? new Date(item.time) : new Date();
+          await addDoc(collection(db, "sensorData"), {
+            temperature: 0,
+            humidity: 0,
+            soilMoisture: 0,
+            light: 0,
+            waterLevel: 0,
+            lightState: false,
+            // We'll store a Firestore Timestamp, or you could store a Date object
+            timestamp: time ? Timestamp.fromDate(time) : new Date()
+          });
+        }
       } catch (error) {
         console.error("Error parsing imported file", error);
       }
@@ -158,16 +199,31 @@ const Logs = () => {
     reader.readAsText(file);
   };
 
-  // Clear logs from the local state
-  const handleClearLogs = () => {
-    setLogs([]);
+  // Clear logs from Firestore: delete all docs in sensorData
+  const handleClearLogs = async () => {
+    try {
+      const snap = await import("firebase/firestore").then(({ getDocs }) =>
+        getDocs(collection(db, "sensorData"))
+      );
+      for (const logDoc of snap.docs) {
+        await deleteDoc(doc(db, "sensorData", logDoc.id));
+      }
+    } catch (error) {
+      console.error("Error clearing logs:", error);
+    }
   };
 
+  // ----------------------------------------------------------------
+  // 5) RENDER
+  // ----------------------------------------------------------------
   return (
     <div className="content">
       <h2>All Logs</h2>
       <div className="logs-container">
+
+        {/* Filters */}
         <div className="logs-filters">
+          {/* Time range */}
           <div className="logs-time-search">
             <div className="logs-time-title">Search Between</div>
             <div className="logs-time-inputs">
@@ -197,6 +253,8 @@ const Logs = () => {
               </div>
             </div>
           </div>
+
+          {/* Search text */}
           <div className="logs-text-search">
             <label htmlFor="logsSearch" className="logs-search-label">
               Search
@@ -211,6 +269,8 @@ const Logs = () => {
             />
           </div>
         </div>
+
+        {/* Table */}
         <table className="logs-table">
           <thead>
             <tr>
@@ -224,7 +284,7 @@ const Logs = () => {
               currentLogs.map((log) => (
                 <tr key={log.id}>
                   <td className="logs-td">{log.id}</td>
-                  <td className="logs-td">{log.time}</td>
+                  <td className="logs-td">{log.timeDisplay}</td>
                   <td className="logs-td">{log.action}</td>
                 </tr>
               ))
@@ -239,6 +299,7 @@ const Logs = () => {
         </table>
       </div>
 
+      {/* Import/Export/Clear */}
       <div className="logs-action-buttons">
         <div className="logs-buttons">
           <button onClick={handleExportLogs} className="logs-button">
@@ -264,7 +325,8 @@ const Logs = () => {
           </button>
         </div>
       </div>
-      
+
+      {/* Pagination */}
       {filteredLogs.length > logsPerPage && (
         <div className="pagination-container">
           <button

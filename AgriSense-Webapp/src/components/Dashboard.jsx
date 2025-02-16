@@ -1,26 +1,33 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
   collection,
   query,
   orderBy,
-  limit,
-  getDocs,
-  doc,
-  updateDoc,
-  arrayUnion
+  onSnapshot,
+  addDoc
 } from "firebase/firestore";
-import debounce from "lodash/debounce";
 import { db } from "../firebaseConfig";
 
-// Utility to format numeric values to 1 decimal place
+/** Utility to format numeric values to 1 decimal place */
 function formatOneDecimal(value) {
   const num = parseFloat(value);
   if (isNaN(num)) return "";
   return num.toFixed(1);
 }
 
+/** 
+ * Helper to produce a string "YYYY-MM-DDTHH:mm:ssZ" 
+ * without milliseconds.
+ */
+function getTimestampString(date = new Date()) {
+  // Example output: "2025-02-02T12:30:00Z"
+  const iso = date.toISOString();       // e.g. "2025-02-02T12:30:00.123Z"
+  const [dayAndTime] = iso.split(".");  // "2025-02-02T12:30:00"
+  return dayAndTime + "Z";             // "2025-02-02T12:30:00Z"
+}
+
 function Dashboard() {
-  // State for sensor values including lightState
+  /** State for the single "latest" document’s fields (left column) */
   const [latestData, setLatestData] = useState({
     temperature: "",
     humidity: "",
@@ -28,265 +35,193 @@ function Dashboard() {
     light: "",
     waterLevel: "",
     lightState: false,
+    timestamp: null,
   });
 
-  // State for storing the document ID of the latest sensor data document
-  const [latestDocId, setLatestDocId] = useState(null);
+  /** State for all sensor docs => from which we build the logs (right column) */
+  const [allDocs, setAllDocs] = useState([]);
 
-  // State for the dashboard logs (latest 5 logs)
+  /** State for the final 5 logs we display (each sensor field = separate line) */
   const [dashboardLogs, setDashboardLogs] = useState([]);
 
-  // -------------------------------
-  // 1) FETCH LATEST SENSOR DATA
-  // -------------------------------
   useEffect(() => {
-    const fetchLatestSensorData = async () => {
-      try {
-        const sensorCollection = collection(db, "sensorData");
-        const q = query(sensorCollection, orderBy("timestamp", "desc"), limit(1));
-        const querySnapshot = await getDocs(q);
+    /**
+     * Real-time subscription to entire sensorData, ordered ascending by timestamp.
+     * We'll store them in `allDocs` so we can keep building the logs array.
+     */
+    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Convert Firestore docs into a simple array
+      const docs = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-        querySnapshot.forEach((docSnapshot) => {
-          setLatestDocId(docSnapshot.id);
-          const data = docSnapshot.data();
-          setLatestData({
-            temperature: data.temperature
-              ? formatOneDecimal(data.temperature[data.temperature.length - 1])
-              : "",
-            humidity: data.humidity
-              ? formatOneDecimal(data.humidity[data.humidity.length - 1])
-              : "",
-            soilMoisture: data.soilMoisture
-              ? formatOneDecimal(data.soilMoisture[data.soilMoisture.length - 1])
-              : "",
-            light: data.light ? formatOneDecimal(data.light[data.light.length - 1]) : "",
-            waterLevel: data.waterLevel !== undefined ? data.waterLevel : "",
-            lightState: data.lightState !== undefined ? data.lightState : false,
-          });
+      setAllDocs(docs);
+
+      if (docs.length === 0) {
+        // If no documents, clear out everything
+        setLatestData({
+          temperature: "",
+          humidity: "",
+          soilMoisture: "",
+          light: "",
+          waterLevel: "",
+          lightState: false,
+          timestamp: null,
         });
-      } catch (error) {
-        console.error("Error fetching sensor data:", error);
+        setDashboardLogs([]);
+        return;
       }
-    };
 
-    fetchLatestSensorData();
+      // 1) The last doc in ascending order is actually the newest
+      const newestDoc = docs[docs.length - 1];
+      setLatestData({
+        temperature: formatOneDecimal(newestDoc.temperature),
+        humidity: formatOneDecimal(newestDoc.humidity),
+        soilMoisture: formatOneDecimal(newestDoc.soilMoisture),
+        light: formatOneDecimal(newestDoc.light),
+        waterLevel: newestDoc.waterLevel ?? "",
+        lightState: newestDoc.lightState ?? false,
+        timestamp: newestDoc.timestamp,
+      });
+
+      // 2) Build an array of "lines" for logs,
+      //    each doc => multiple lines
+      const lines = [];
+      docs.forEach((docData) => {
+        // The 'timestamp' is stored as a string in the new approach
+        // Attempt to parse it as a Date so we can sort/format easily
+        let timeObj = new Date(0); // fallback
+        if (typeof docData.timestamp === "string") {
+          // e.g. "2025-02-02T12:30:00Z"
+          const parsed = new Date(docData.timestamp);
+          if (!isNaN(parsed.getTime())) {
+            timeObj = parsed;
+          }
+        }
+
+        const timeDisplay = timeObj.toLocaleString();
+
+        const sensorFields = [
+          { label: "Temperature", value: docData.temperature },
+          { label: "Humidity", value: docData.humidity },
+          { label: "Soil Moisture", value: docData.soilMoisture },
+          { label: "Light", value: docData.light },
+          { label: "Water Level", value: docData.waterLevel },
+          { label: "Light State", value: docData.lightState },
+        ];
+
+        sensorFields.forEach((field) => {
+          if (field.value !== undefined && field.value !== null) {
+            lines.push({
+              // We'll assign an ID after building the array
+              time: timeObj,
+              timeDisplay,
+              action: `Reading of ${field.label}: ${field.value}`,
+            });
+          }
+        });
+      });
+
+      // 3) lines[] is in ascending order (earliest to latest).
+      lines.forEach((line, idx) => {
+        line.id = idx + 1;
+      });
+
+      // 4) Slice out the last 5 lines (the newest 5),
+      //    then reverse them so the newest line appears first.
+      const last5 = lines.slice(-5).reverse();
+      setDashboardLogs(last5);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // -------------------------------
-  // 2) FETCH LATEST 5 LOGS
-  // -------------------------------
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const sensorCollection = collection(db, "sensorData");
-        const querySnapshot = await getDocs(sensorCollection);
-        const logsData = [];
-
-        querySnapshot.forEach((docSnapshot) => {
-          const data = docSnapshot.data();
-          const timestampArray = data.timestamp; // Shared timestamp array
-
-          // Helper to create log entries from each sensor's array
-          const addLogEntry = (sensorType, values) => {
-            if (Array.isArray(values) && Array.isArray(timestampArray)) {
-              values.forEach((value, index) => {
-                if (timestampArray[index]) {
-                  logsData.push({
-                    time: new Date(timestampArray[index]),
-                    action: `Collected data of ${sensorType}: ${value}`,
-                  });
-                }
-              });
-            }
-          };
-
-          addLogEntry("Temperature", data.temperature);
-          addLogEntry("Humidity", data.humidity);
-          addLogEntry("Soil Moisture", data.soilMoisture);
-          addLogEntry("Light", data.light);
-        });
-
-        // Sort logs in descending order (latest first)
-        logsData.sort((a, b) => b.time - a.time);
-
-        // Keep only the latest 5 logs
-        const latestFive = logsData.slice(0, 5).map((log, index) => ({
-          id: index + 1, // local index
-          time: log.time.toLocaleString(),
-          action: log.action,
-        }));
-
-        setDashboardLogs(latestFive);
-      } catch (error) {
-        console.error("Error fetching dashboard logs:", error);
-      }
+  /** 
+   * Creates a new reading with waterLevel=100 
+   * and a string-based timestamp.
+   */
+  const fillWater = async () => {
+    const newDoc = {
+      temperature: parseFloat(latestData.temperature) || 0,
+      humidity: parseFloat(latestData.humidity) || 0,
+      soilMoisture: parseFloat(latestData.soilMoisture) || 0,
+      light: parseFloat(latestData.light) || 0,
+      waterLevel: 100,
+      lightState: latestData.lightState,
+      timestamp: getTimestampString(),  // e.g. "2025-02-02T12:30:00Z"
     };
 
-    fetchLogs();
-  }, []);
-
-  // -------------------------------
-  // HANDLERS & HELPERS
-  // -------------------------------
-
-  // Local state updates for sensor inputs
-  const handleChange = (e, key) => {
-    setLatestData((prev) => ({
-      ...prev,
-      [key]: e.target.value,
-    }));
-  };
-
-  // Prevent direct typing into numeric fields (except arrow keys, Tab, Enter)
-  const handleKeyDown = (e) => {
-    const allowedKeys = ["ArrowUp", "ArrowDown", "Tab", "Enter"];
-    if (!allowedKeys.includes(e.key)) {
-      e.preventDefault();
+    try {
+      await addDoc(collection(db, "sensorData"), newDoc);
+    } catch (error) {
+      console.error("Error creating new reading:", error);
     }
   };
 
   /**
-   * updateSensorInFirebase: Appends a new float value to the specified array field
-   * and also appends a new timestamp to `timestamp`.
-   * This is done for temperature, humidity, soilMoisture, and light changes.
+   * Updates lightState by creating a new doc with the chosen boolean value.
    */
-  const updateSensorInFirebase = async (field, stringValue) => {
-    if (!latestDocId) return;
+  const handleLightStateChange = async (e) => {
+    const val = e.target.value === "true"; // "on" -> true, "off" -> false
+    const newDoc = {
+      temperature: parseFloat(latestData.temperature) || 0,
+      humidity: parseFloat(latestData.humidity) || 0,
+      soilMoisture: parseFloat(latestData.soilMoisture) || 0,
+      light: parseFloat(latestData.light) || 0,
+      waterLevel: parseFloat(latestData.waterLevel) || 0,
+      lightState: val,
+      timestamp: getTimestampString(),
+    };
+
     try {
-      const docRef = doc(db, "sensorData", latestDocId);
-      const floatVal = parseFloat(stringValue) || 0;
-
-      // Create a new timestamp as an ISO string
-      const now = new Date().toISOString();
-
-      await updateDoc(docRef, {
-        [field]: arrayUnion(floatVal),
-        timestamp: arrayUnion(now),
-      });
-
-      // Update local state to show 1 decimal place
-      setLatestData((prev) => ({
-        ...prev,
-        [field]: floatVal.toFixed(1),
-      }));
+      await addDoc(collection(db, "sensorData"), newDoc);
     } catch (error) {
-      console.error(`Error updating ${field} in Firebase:`, error);
+      console.error("Error changing lightState:", error);
     }
   };
 
-  // Debounced version for the Light slider
-  const debouncedUpdateSensor = useCallback(
-    debounce((field, stringValue) => {
-      if (!latestDocId) return;
-      const docRef = doc(db, "sensorData", latestDocId);
-      const floatVal = parseFloat(stringValue) || 0;
-      const now = new Date().toISOString();
-
-      updateDoc(docRef, {
-        [field]: arrayUnion(floatVal),
-        timestamp: arrayUnion(now),
-      })
-        .then(() => {
-          // Update local state to show 1 decimal place for the slider value
-          setLatestData((prev) => ({
-            ...prev,
-            [field]: floatVal.toFixed(1),
-          }));
-        })
-        .catch((error) => {
-          console.error(`Error updating ${field} (debounced) in Firebase:`, error);
-        });
-    }, 500),
-    [latestDocId]
-  );
-
-  // Fill water with a direct update (no timestamp needed)
-  const fillWater = async () => {
-    if (!latestDocId) return;
-    try {
-      const docRef = doc(db, "sensorData", latestDocId);
-      await updateDoc(docRef, { waterLevel: 100 });
-      setLatestData((prevData) => ({ ...prevData, waterLevel: 100 }));
-    } catch (error) {
-      console.error("Error updating water level in Firebase:", error);
-    }
-  };
-
-  // Update lightState as a boolean (no timestamp needed)
-  const updateLightStateInFirebase = async (value) => {
-    if (!latestDocId) return;
-    try {
-      const docRef = doc(db, "sensorData", latestDocId);
-      await updateDoc(docRef, { lightState: value });
-    } catch (error) {
-      console.error("Error updating light state in Firebase:", error);
-    }
-  };
-
-  // Handler for the light state radio buttons
-  const handleLightStateChange = (e) => {
-    const value = e.target.value === "true";
-    setLatestData((prevData) => ({ ...prevData, lightState: value }));
-    updateLightStateInFirebase(value);
-  };
-
-  // -------------------------------
-  // RENDER
-  // -------------------------------
   return (
     <div className="content">
       <h2>Dashboard</h2>
       <div className="dashboard-container">
-        {/* Left side: sensor data */}
+        {/* LEFT: LATEST SENSOR DATA */}
         <div className="sensor-data-container">
           <div className="sensor-data">
             <h3>Latest Sensor Data</h3>
             <div className="sensor-row">
-              <label>
-                <strong>Temperature:</strong>
-              </label>
+              <label><strong>Temperature:</strong></label>
               <input
                 type="number"
                 value={latestData.temperature}
-                onChange={(e) => handleChange(e, "temperature")}
-                onBlur={() => updateSensorInFirebase("temperature", latestData.temperature)}
-                onKeyDown={handleKeyDown}
+                readOnly
                 className="sensor-input"
               />{" "}
               °C
             </div>
             <div className="sensor-row">
-              <label>
-                <strong>Humidity:</strong>
-              </label>
+              <label><strong>Humidity:</strong></label>
               <input
                 type="number"
                 value={latestData.humidity}
-                onChange={(e) => handleChange(e, "humidity")}
-                onBlur={() => updateSensorInFirebase("humidity", latestData.humidity)}
-                onKeyDown={handleKeyDown}
+                readOnly
                 className="sensor-input"
               />{" "}
               %
             </div>
             <div className="sensor-row">
-              <label>
-                <strong>Soil Moisture:</strong>
-              </label>
+              <label><strong>Soil Moisture:</strong></label>
               <input
                 type="number"
                 value={latestData.soilMoisture}
-                onChange={(e) => handleChange(e, "soilMoisture")}
-                onBlur={() => updateSensorInFirebase("soilMoisture", latestData.soilMoisture)}
-                onKeyDown={handleKeyDown}
+                readOnly
                 className="sensor-input"
               />{" "}
               %
             </div>
             <div className="sensor-row">
-              <label>
-                <strong>Water Level:</strong>
-              </label>
+              <label><strong>Water Level:</strong></label>
               <input
                 type="number"
                 value={latestData.waterLevel}
@@ -299,26 +234,17 @@ function Dashboard() {
               </button>
             </div>
             <div className="sensor-row">
-              <label>
-                <strong>Light:</strong>
-              </label>
+              <label><strong>Light:</strong></label>
               <input
-                type="range"
-                min="0"
-                max="100"
+                type="number"
                 value={latestData.light}
-                onChange={(e) => {
-                  handleChange(e, "light");
-                  debouncedUpdateSensor("light", latestData.light);
-                }}
-                className="sensor-slider"
-              />
-              <span>{formatOneDecimal(latestData.light)} lux</span>
+                readOnly
+                className="sensor-input"
+              />{" "}
+              lux
             </div>
             <div className="sensor-row">
-              <label>
-                <strong>Light State:</strong>
-              </label>
+              <label><strong>Light State:</strong></label>
               <div className="radio-group">
                 <label>
                   <input
@@ -345,7 +271,7 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Right side: logs table */}
+        {/* RIGHT: LATEST FIVE LOGS (EACH FIELD AS ITS OWN LINE) */}
         <div className="dashboard-logs-container">
           <h3>Latest Logs</h3>
           <table className="logs-table">
@@ -361,7 +287,7 @@ function Dashboard() {
                 dashboardLogs.map((log) => (
                   <tr key={log.id}>
                     <td className="logs-td">{log.id}</td>
-                    <td className="logs-td">{log.time}</td>
+                    <td className="logs-td">{log.timeDisplay}</td>
                     <td className="logs-td">{log.action}</td>
                   </tr>
                 ))
