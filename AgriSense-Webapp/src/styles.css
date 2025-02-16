@@ -52,16 +52,30 @@ nav a:hover {
 /* Content Area Below Navigation */
 .content {
   padding-top: 100px; /* Adds spacing below the fixed nav */
-  width: 90%;
   max-width: 1200px;
   margin: auto;
   display: flex;
   flex-direction: column;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 /*GRAPH STYLING*/
-/* Graph Container */
+/* Graph panel container*/
+.graph-panel {
+  background-color: #2d2d44;
+  border-radius: 8px;
+  padding: 25px;
+  margin-top: 22px;
+  width: 100%;
+  max-width: 1000px; 
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
+}
+
 .graph-container {
   width: 100%;
   max-width: 1000px;
@@ -124,6 +138,7 @@ label {
   padding: 25px;
   width: 120%;
   max-width: 600px;
+
   text-align: center;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   margin-top: 20px;
@@ -178,7 +193,8 @@ table {
 }
 
 /* Table Headers & Cells */
-th, td {
+th,
+td {
   padding: 15px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   font-size: 1.2rem;
@@ -196,22 +212,14 @@ tr:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* Center Content on Page */
-.content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   table {
     max-width: 95%;
   }
 
-  th, td {
+  th,
+  td {
     font-size: 1rem;
     padding: 10px;
   }
@@ -222,11 +230,11 @@ tr:hover {
   margin-top: 20px;
   width: 140%;
   max-height: 500px; /* Adjust height as needed */
-  overflow-y: auto;  /* Enables vertical scrolling within the container */
+  overflow-y: auto; /* Enables vertical scrolling within the container */
   border-radius: 8px;
   padding: 10px;
   background-color: #2d2d44;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 /* Container for both time and text search filters */
@@ -240,7 +248,7 @@ tr:hover {
 .logs-time-search {
   display: flex;
   flex-direction: column;
-  align-items: center;  /* Centers the contents horizontally */
+  align-items: center; /* Centers the contents horizontally */
   text-align: center;
 }
 
@@ -249,7 +257,7 @@ tr:hover {
   font-weight: bold;
   margin-bottom: 5px;
   color: #ffffff;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 /* Container for the two datetime inputs – center them */
@@ -263,13 +271,13 @@ tr:hover {
 .logs-time-group {
   display: flex;
   flex-direction: column;
-  align-items: center;  /* Center the label and input */
+  align-items: center; /* Center the label and input */
 }
 
 /* Label for each time input */
 .logs-time-label {
   margin-bottom: 3px;
-  font-size: 1.0rem;
+  font-size: 1rem;
   color: #ffffff;
 }
 
@@ -296,7 +304,7 @@ tr:hover {
   font-weight: bold;
   margin-bottom: 5px;
   color: #ffffff;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 /* Styling for the text search input */
@@ -320,14 +328,14 @@ tr:hover {
   border-bottom: 2px solid #8ecae6;
   color: #ffffff;
   text-align: left;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 .logs-td {
   padding: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.33);
   color: #ffffff;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 /* Pagination Styling */
@@ -336,7 +344,7 @@ tr:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 .pagination-button {
@@ -347,7 +355,7 @@ tr:hover {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 .pagination-button.active {
@@ -411,7 +419,7 @@ tr:hover {
   border-radius: 8px;
   padding: 15px;
   background-color: #2d2d44;
-  height: 350px;
+  height: 375px;
   margin-top: 22px;
   text-align: center;
 }
@@ -427,14 +435,14 @@ tr:hover {
   border-bottom: 2px solid #8ecae6;
   color: #ffffff;
   text-align: left;
-  font-size: 1.0rem;
+  font-size: 1rem;
 }
 
 .logs-td {
   padding: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.33);
   color: #ffffff;
-  font-size: 1.0rem;
+  font-size: 0.95rem;
 }
 
 /* Container for each sensor row */
@@ -451,9 +459,10 @@ tr:hover {
 
 /* Style for the numeric inputs (smaller width) */
 .sensor-input {
-  width: 70px;  /* Adjust width as needed */
+  width: 75px; /* Adjust width as needed */
   padding: 4px;
   margin-right: 5px;
+  text-align: center;
 }
 
 /* Optional styling for the slider */
@@ -478,10 +487,209 @@ tr:hover {
   align-items: center;
   gap: 20px;
   padding: 10px;
-  margin-left: 115px;
+  margin-left: 100px;
 }
 
 /* Add spacing between radio buttons and their labels */
 .radio-group input[type="radio"] {
   margin-right: 5px;
+}
+
+/* Outer container to constrain width and center everything */
+.control-panel-container {
+  max-width: 1000px;
+  margin: 2rem auto; /* centers horizontally */
+  padding: 0 1rem; /* optional horizontal padding */
+  background-color: #2d2d44;
+  border-radius: 8px;
+  height: 420px;
+  padding: 25px;
+  margin-top: 22px;
+}
+
+/* The 4-column grid inside the container */
+.control-panel-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 2fr 2fr auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+  align-items: center; /* vertically center each row's content */
+}
+
+/* Column 1: label */
+.row-label {
+  text-align: right;
+  font-size: 1rem;
+}
+
+/* Column 2 (row-latest) and Column 3 (row-edited):
+   Both contain an input + small unit label */
+.row-latest,
+.row-edited {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Column 4: the "Set" button(s) */
+.row-set {
+  display: flex;
+  justify-content: center;
+}
+
+/* Label for units (°C, %, lux) */
+.unit {
+  font-size: 0.9rem;
+  color: #bbb;
+}
+
+/* Buttons for "Set" and "Set All" */
+.set-button {
+  padding: 5px 10px;
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.set-button:hover {
+  background-color: #8ecae6;
+  color: #2d2d44;
+}
+
+/* Heading columns for "Current" and "Set To" */
+.heading-col {
+  text-align: center; /* Center text within the grid cell */
+  font-weight: bold;
+  font-size: 1.1rem; /* Slightly larger font if desired */
+  margin-right: 70px;
+}
+
+/* Container for the alert section */
+.alert-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: #2d2d44;
+  border-radius: 8px;
+}
+
+.alert-grid-4col {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2fr 2fr; 
+  column-gap: 1rem;
+  row-gap: 1rem;
+  align-items: start; /* top-align columns */
+}
+
+/* Common label styling for steps (e.g., "1. Create/Update Alert Name") */
+.alert-step {
+  margin-bottom: 0.5rem;
+  margin-left: 5px;
+}
+
+.alert-right-label {
+  margin-left: 30px;
+}
+
+.alert-last-label {
+  margin-left: 65px;
+}
+
+/* Left column items */
+.alert-left .alert-name-row {
+  display: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 30px;
+}
+
+.alert-middle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.alert-name-input {
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+  margin-left: 40px;
+  margin-top: 20px;
+}
+
+/* Middle column items */
+.alert-datetime-input {
+  margin-top: 40px;
+  margin-left: 5px;
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+}
+
+/* Right column items */
+.alert-right .alert-buttons {
+  display: flex;
+  flex-direction: column; /* vertical stacking for the two buttons */
+  gap: 1rem;
+  margin-top: 29px; 
+  margin-right: 30px;
+}
+
+/* Example styling for the two new alert buttons */
+.alert-buttons button {
+  padding: 5px 10px;
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+}
+.alert-buttons button:hover {
+  background-color: #8ecae6;
+  color: #2d2d44;
+}
+
+.alert-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 4th column: "Saved Alert(s)" + dropdown + "Clear Alerts" */
+.alert-saved {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* The dropdown for saved alerts */
+.alert-dropdown {
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+  margin-right: 5px;
+}
+
+/* The clear button below the dropdown */
+.alert-clear-button {
+  padding: 5px 10px;
+  align-self: flex-start;  /* keep it left-aligned */
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  margin-left: 70px;
+}
+.alert-clear-button:hover {
+  background-color: #8ecae6;
+  color: #2d2d44;
 }

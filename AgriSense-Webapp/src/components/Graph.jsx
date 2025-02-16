@@ -1,71 +1,70 @@
+// src/components/Graph.jsx
 import React, { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 
 const Graph = () => {
   const [sensorData, setSensorData] = useState([]);
-  const [selectedField, setSelectedField] = useState("all"); // Default to showing all datasets
+  const [selectedField, setSelectedField] = useState("all"); // "humidity", "temperature", etc.
 
   useEffect(() => {
-    const fetchSensorData = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "sensorData"));
-        const fetchedData = querySnapshot.docs.map((doc) => doc.data());
-        setSensorData(fetchedData);
-      } catch (error) {
-        console.error("Error fetching Firestore data:", error);
-      }
-    };
+    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          timestamp: data.timestamp,
+          temperature: data.temperature,
+          humidity: data.humidity,
+          soilMoisture: data.soilMoisture,
+          light: data.light,
+        };
+      });
+      setSensorData(docs);
+    });
 
-    fetchSensorData();
+    return () => unsub();
   }, []);
 
-  // Extract timestamps and data for each field
-  let timestamps = [];
-  let humidityData = [];
-  let temperatureData = [];
-  let lightData = [];
-  let soilMoistureData = [];
+  // Build separate arrays
+  const timestamps = [];
+  const humidityData = [];
+  const temperatureData = [];
+  const lightData = [];
+  const soilMoistureData = [];
 
   sensorData.forEach((entry) => {
-    if (entry.timestamp) {
-      timestamps = timestamps.concat(
-        entry.timestamp.map((ts) => {
-          const date = new Date(ts);
-          return isNaN(date)
-            ? "Invalid Date"
-            : date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) +
-              " " +
-              date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-        })
-      );
+    let ts = entry.timestamp;
+    if (ts && ts.toDate) {
+      ts = ts.toDate();
+    } else if (ts) {
+      ts = new Date(ts);
+    } else {
+      ts = new Date(0);
     }
-    if (entry.humidity) humidityData = humidityData.concat(entry.humidity);
-    if (entry.temperature) temperatureData = temperatureData.concat(entry.temperature);
-    if (entry.light) lightData = lightData.concat(entry.light);
-    if (entry.soilMoisture) soilMoistureData = soilMoistureData.concat(entry.soilMoisture);
+
+    const label =
+      ts.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }) +
+      " " +
+      ts.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+    timestamps.push(label);
+    humidityData.push(entry.humidity);
+    temperatureData.push(entry.temperature);
+    soilMoistureData.push(entry.soilMoisture);
+    lightData.push(entry.light);
   });
 
-  // Filter out invalid dates
-  timestamps = timestamps.filter((ts) => ts !== "Invalid Date");
-
-  // Ensure all datasets align with the timestamps array length
-  const minLength = Math.min(
-    timestamps.length,
-    humidityData.length,
-    temperatureData.length,
-    lightData.length,
-    soilMoistureData.length
-  );
-  timestamps = timestamps.slice(0, minLength);
-  humidityData = humidityData.slice(0, minLength);
-  temperatureData = temperatureData.slice(0, minLength);
-  lightData = lightData.slice(0, minLength);
-  soilMoistureData = soilMoistureData.slice(0, minLength);
-
-  // Define colors for different datasets
+  // Define colors
   const fieldColors = {
     humidity: "rgba(54, 162, 235, 1)",
     temperature: "rgba(255, 99, 132, 1)",
@@ -73,77 +72,93 @@ const Graph = () => {
     soilMoisture: "rgba(75, 192, 192, 1)",
   };
 
-  // Chart.js Data Configuration
-  const chartData = {
-    labels: timestamps,
-    datasets:
-      selectedField === "all"
-        ? [
-            {
-              label: "Humidity (%)",
-              data: humidityData,
-              borderColor: fieldColors.humidity,
-              borderWidth: 2,
-              fill: false,
-            },
-            {
-              label: "Temperature (°C)",
-              data: temperatureData,
-              borderColor: fieldColors.temperature,
-              borderWidth: 2,
-              fill: false,
-            },
-            {
-              label: "Light (lux)",
-              data: lightData,
-              borderColor: fieldColors.light,
-              borderWidth: 2,
-              fill: false,
-            },
-            {
-              label: "Soil Moisture (%)",
-              data: soilMoistureData,
-              borderColor: fieldColors.soilMoisture,
-              borderWidth: 2,
-              fill: false,
-            },
-          ]
-        : [
-            {
-              label: `${selectedField.charAt(0).toUpperCase() + selectedField.slice(1)} Data`,
-              data:
-                selectedField === "humidity"
-                  ? humidityData
-                  : selectedField === "temperature"
-                  ? temperatureData
-                  : selectedField === "light"
-                  ? lightData
-                  : soilMoistureData,
-              borderColor: fieldColors[selectedField],
-              borderWidth: 2,
-              fill: false,
-            },
-          ],
-  };
+  // Build chartData depending on selectedField
+  let chartData;
+  if (selectedField === "all") {
+    chartData = {
+      labels: timestamps,
+      datasets: [
+        {
+          label: "Humidity (%)",
+          data: humidityData,
+          borderColor: fieldColors.humidity,
+          borderWidth: 2,
+          fill: false,
+        },
+        {
+          label: "Temperature (°C)",
+          data: temperatureData,
+          borderColor: fieldColors.temperature,
+          borderWidth: 2,
+          fill: false,
+        },
+        {
+          label: "Light (lux)",
+          data: lightData,
+          borderColor: fieldColors.light,
+          borderWidth: 2,
+          fill: false,
+        },
+        {
+          label: "Soil Moisture (%)",
+          data: soilMoistureData,
+          borderColor: fieldColors.soilMoisture,
+          borderWidth: 2,
+          fill: false,
+        },
+      ],
+    };
+  } else {
+    let labelName = "";
+    let dataArr = [];
+    let color = fieldColors.humidity;
 
-  // Chart.js Options - Formatting the X-Axis
+    if (selectedField === "humidity") {
+      labelName = "Humidity (%)";
+      dataArr = humidityData;
+      color = fieldColors.humidity;
+    } else if (selectedField === "temperature") {
+      labelName = "Temperature (°C)";
+      dataArr = temperatureData;
+      color = fieldColors.temperature;
+    } else if (selectedField === "light") {
+      labelName = "Light (lux)";
+      dataArr = lightData;
+      color = fieldColors.light;
+    } else {
+      labelName = "Soil Moisture (%)";
+      dataArr = soilMoistureData;
+      color = fieldColors.soilMoisture;
+    }
+
+    chartData = {
+      labels: timestamps,
+      datasets: [
+        {
+          label: labelName,
+          data: dataArr,
+          borderColor: color,
+          borderWidth: 2,
+          fill: false,
+        },
+      ],
+    };
+  }
+
+  // Chart options
   const chartOptions = {
     responsive: true,
     plugins: {
       legend: {
         labels: {
-          color: "#ffffff", // White text for better readability
+          color: "#ffffff",
         },
       },
       tooltip: {
-        enabled: true, // Ensure tooltips are enabled
-        mode: "nearest", // Show data for the nearest point
-        intersect: false, // Allow hovering over multiple points
-        backgroundColor: "rgba(0, 0, 0, 0.8)", // Dark background for visibility
-        titleFont: { size: 14 },
-        bodyFont: { size: 14 },
-        padding: 10,
-        cornerRadius: 6,
+        enabled: true,
+        mode: "nearest",
+        intersect: false,
+        backgroundColor: "rgba(0,0,0,0.8)",
       },
     },
     hover: {
@@ -153,8 +168,8 @@ const Graph = () => {
     scales: {
       x: {
         ticks: {
-          color: "#ffffff", // White text for better readability
-          maxRotation: 45, // Rotate labels for better spacing
+          color: "#ffffff",
+          maxRotation: 45,
           minRotation: 45,
         },
       },
@@ -165,21 +180,27 @@ const Graph = () => {
       },
     },
   };
-  
 
   return (
     <div className="content">
       <h2>Sensor Data Over Time</h2>
-      <label>Select Data Type: </label>
-      <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)}>
-        <option value="all">Show All</option>
-        <option value="humidity">Humidity (%)</option>
-        <option value="temperature">Temperature (°C)</option>
-        <option value="light">Light (lux)</option>
-        <option value="soilMoisture">Soil Moisture (%)</option>
-      </select>
-      <div className="graph-container">
-        <Line data={chartData} options={chartOptions} />
+
+      <div className="graph-panel">
+        <label>Select Data Type: </label>
+        <select
+          value={selectedField}
+          onChange={(e) => setSelectedField(e.target.value)}
+        >
+          <option value="all">Show All</option>
+          <option value="humidity">Humidity (%)</option>
+          <option value="temperature">Temperature (°C)</option>
+          <option value="light">Light (lux)</option>
+          <option value="soilMoisture">Soil Moisture (%)</option>
+        </select>
+
+        <div className="graph-container">
+          <Line data={chartData} options={chartOptions} />
+        </div>
       </div>
     </div>
   );
