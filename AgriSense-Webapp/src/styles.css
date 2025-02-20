@@ -56,14 +56,12 @@ nav a:hover {
   margin: auto;
   display: flex;
   flex-direction: column;
-  display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
 }
 
-/*GRAPH STYLING*/
-/* Graph panel container*/
+/* GRAPH STYLING */
 .graph-panel {
   background-color: #2d2d44;
   border-radius: 8px;
@@ -109,150 +107,31 @@ label {
   color: #ffffff;
 }
 
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-  nav {
-    flex-direction: column;
-    padding: 10px;
-  }
-
-  nav a {
-    margin: 10px 0;
-  }
-
-  .content {
-    padding-top: 120px; /* Adds extra spacing for smaller screens */
-  }
-
-  .graph-container {
-    max-width: 95%;
-    height: 400px;
-  }
-}
-
-/*LOGS STYLING*/
-/* Dashboard Container */
-.sensor-data {
-  background: #2d2d44;
-  border-radius: 10px;
-  padding: 25px;
-  width: 120%;
-  max-width: 600px;
-
-  text-align: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  margin-top: 20px;
-}
-
-/* Sensor Data Styling */
-.sensor-data p {
-  font-size: 1.2rem;
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.sensor-data p:last-child {
-  border-bottom: none;
-}
-
-.sensor-data strong {
-  color: #8ecae6;
-}
-
-/* Improve Dashboard Spacing */
-.content h2 {
-  font-size: 2rem;
-  margin-bottom: 15px;
-  color: #ffffff;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-  .sensor-data {
-    width: 90%;
-    max-width: 400px;
-  }
-
-  .sensor-data p {
-    font-size: 1rem;
-  }
-
-  .content h2 {
-    font-size: 1.5rem;
-  }
-}
-
-/* Ensure Table is Full Width */
-table {
-  width: 100%;
-  max-width: 900px; /* Keep it well-sized for readability */
-  margin-top: 20px;
-  border-collapse: collapse;
-  text-align: left;
-  color: #ffffff;
-}
-
-/* Table Headers & Cells */
-th,
-td {
-  padding: 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  font-size: 1.2rem;
-}
-
-/* Table Header Styling */
-th {
-  background: #3a3a55;
-  color: #8ecae6;
-  font-size: 1.3rem;
-}
-
-/* Hover Effect for Table Rows */
-tr:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-  table {
-    max-width: 95%;
-  }
-
-  th,
-  td {
-    font-size: 1rem;
-    padding: 10px;
-  }
-}
-
-/* Logs Component Styling with Smaller Font Size and Scrollbar */
+/* LOGS STYLING */
 .logs-container {
   margin-top: 20px;
   width: 140%;
-  max-height: 500px; /* Adjust height as needed */
-  overflow-y: auto; /* Enables vertical scrolling within the container */
+  max-height: 500px;
+  overflow-y: auto;
   border-radius: 8px;
   padding: 10px;
   background-color: #2d2d44;
   font-size: 1rem;
 }
 
-/* Container for both time and text search filters */
 .logs-filters {
   display: flex;
   justify-content: space-between;
   margin-bottom: 10px;
 }
 
-/* Time range search container (left side) – centered */
 .logs-time-search {
   display: flex;
   flex-direction: column;
-  align-items: center; /* Centers the contents horizontally */
+  align-items: center;
   text-align: center;
 }
 
-/* Title above the time search inputs */
 .logs-time-title {
   font-weight: bold;
   margin-bottom: 5px;
@@ -260,28 +139,24 @@ tr:hover {
   font-size: 1rem;
 }
 
-/* Container for the two datetime inputs – center them */
 .logs-time-inputs {
   display: flex;
   gap: 10px;
   justify-content: center;
 }
 
-/* Grouping for individual time input with its label */
 .logs-time-group {
   display: flex;
   flex-direction: column;
-  align-items: center; /* Center the label and input */
+  align-items: center;
 }
 
-/* Label for each time input */
 .logs-time-label {
   margin-bottom: 3px;
   font-size: 1rem;
   color: #ffffff;
 }
 
-/* Styling for the datetime inputs */
 .logs-time-input {
   padding: 5px;
   border: 1px solid #8ecae6;
@@ -290,16 +165,14 @@ tr:hover {
   color: #ffffff;
 }
 
-/* Text search container (right side) */
 .logs-text-search {
   display: flex;
   flex-direction: column;
-  align-items: center; /* Center the label and input */
-  max-width: 220px; /* Keeps the container from stretching */
+  align-items: center;
+  max-width: 220px;
   text-align: center;
 }
 
-/* Label above the text search input */
 .logs-search-label {
   font-weight: bold;
   margin-bottom: 5px;
@@ -307,9 +180,8 @@ tr:hover {
   font-size: 1rem;
 }
 
-/* Styling for the text search input */
 .logs-search {
-  width: 200px; /* Fixed width to keep it normal sized */
+  width: 200px;
   padding: 5px;
   border: 1px solid #8ecae6;
   border-radius: 4px;
@@ -317,28 +189,31 @@ tr:hover {
   color: #ffffff;
 }
 
-/* Table Styling */
-.logs-table {
+table {
   width: 100%;
   border-collapse: collapse;
-}
-
-.logs-th {
-  padding: 10px;
-  border-bottom: 2px solid #8ecae6;
-  color: #ffffff;
   text-align: left;
-  font-size: 1rem;
-}
-
-.logs-td {
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.33);
   color: #ffffff;
-  font-size: 1rem;
 }
 
-/* Pagination Styling */
+th,
+td {
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 1.2rem;
+}
+
+th {
+  background: #3a3a55;
+  color: #8ecae6;
+  font-size: 1.3rem;
+}
+
+tr:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Pagination */
 .pagination-container {
   margin-top: 20px;
   display: flex;
@@ -368,7 +243,7 @@ tr:hover {
   cursor: not-allowed;
 }
 
-/* Container for all action buttons */
+/* Logs buttons */
 .logs-action-buttons {
   display: flex;
   align-items: center;
@@ -377,7 +252,6 @@ tr:hover {
   margin-top: 10px;
 }
 
-/* Container for import/export buttons: center them */
 .logs-buttons {
   flex: 1;
   display: flex;
@@ -386,11 +260,9 @@ tr:hover {
 }
 
 .clear-logs-container {
-  /* You can add padding/margin if needed */
   margin-right: -100px;
 }
 
-/* Existing styling for the buttons */
 .logs-button,
 .clear-logs-button {
   padding: 5px 10px;
@@ -401,21 +273,43 @@ tr:hover {
   cursor: pointer;
 }
 
-/*DASHBOARD STYLING*/
-/* Main container for the dashboard (flex layout) */
+/* DASHBOARD STYLING */
 .dashboard-container {
   display: flex;
   gap: 150px;
 }
 
-/* Left container for sensor data */
 .sensor-data-container {
-  flex: 1.5;
+  flex: 2;
 }
 
-/* Right container for logs */
+.sensor-data {
+  background: #2d2d44;
+  border-radius: 10px;
+  padding: 25px;
+  width: 120%;
+  max-width: 600px;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  margin-top: 20px;
+}
+
+.sensor-data p {
+  font-size: 1.2rem;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sensor-data p:last-child {
+  border-bottom: none;
+}
+
+.sensor-data strong {
+  color: #8ecae6;
+}
+
 .dashboard-logs-container {
-  flex: 2;
+  flex: 3;
   border-radius: 8px;
   padding: 15px;
   background-color: #2d2d44;
@@ -424,7 +318,6 @@ tr:hover {
   text-align: center;
 }
 
-/* Table styling, mirroring what's in Logs.jsx */
 .logs-table {
   width: 100%;
   border-collapse: collapse;
@@ -442,88 +335,65 @@ tr:hover {
   padding: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.33);
   color: #ffffff;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
-/* Container for each sensor row */
 .sensor-row {
   margin-bottom: 12px;
   display: center;
   align-items: center;
 }
 
-/* Spacing between label and input */
 .sensor-row label {
   margin-right: 10px;
 }
 
-/* Style for the numeric inputs (smaller width) */
 .sensor-input {
-  width: 75px; /* Adjust width as needed */
+  width: 75px;
   padding: 4px;
   margin-right: 5px;
   text-align: center;
 }
 
-/* Optional styling for the slider */
-.sensor-slider {
-  margin: 0 10px;
-}
-
-/* Styling for the Fill Water button */
-.fill-water-button {
-  margin-left: 10px;
-  padding: 4px 8px;
-  border: 1px solid #8ecae6;
-  border-radius: 4px;
-  background-color: #2d2d44;
-  color: #ffffff;
-  cursor: pointer;
-}
-
-/* Styling for the radio button group for Light State */
 .radio-group {
   display: flex;
   align-items: center;
   gap: 20px;
   padding: 10px;
-  margin-left: 100px;
+  margin-left: 65px;
 }
 
-/* Add spacing between radio buttons and their labels */
 .radio-group input[type="radio"] {
   margin-right: 5px;
 }
 
-/* Outer container to constrain width and center everything */
+/* CONTROL PANEL */
 .control-panel-container {
   max-width: 1000px;
-  margin: 2rem auto; /* centers horizontally */
-  padding: 0 1rem; /* optional horizontal padding */
+  margin: 2rem auto;
+  padding: 0 1rem;
   background-color: #2d2d44;
   border-radius: 8px;
-  height: 420px;
+  height: 650px;
   padding: 25px;
   margin-top: 22px;
+  text-align: center;
 }
 
-/* The 4-column grid inside the container */
 .control-panel-grid {
   display: grid;
   grid-template-columns: 1.5fr 2fr 2fr auto;
   column-gap: 1rem;
   row-gap: 1rem;
-  align-items: center; /* vertically center each row's content */
+  align-items: center;
+  margin-top: 10px;
 }
 
-/* Column 1: label */
 .row-label {
   text-align: right;
   font-size: 1rem;
 }
 
-/* Column 2 (row-latest) and Column 3 (row-edited):
-   Both contain an input + small unit label */
 .row-latest,
 .row-edited {
   display: flex;
@@ -531,19 +401,16 @@ tr:hover {
   gap: 0.5rem;
 }
 
-/* Column 4: the "Set" button(s) */
 .row-set {
   display: flex;
   justify-content: center;
 }
 
-/* Label for units (°C, %, lux) */
 .unit {
   font-size: 0.9rem;
   color: #bbb;
 }
 
-/* Buttons for "Set" and "Set All" */
 .set-button {
   padding: 5px 10px;
   border: 1px solid #8ecae6;
@@ -551,6 +418,7 @@ tr:hover {
   background-color: #2d2d44;
   color: #ffffff;
   cursor: pointer;
+  font-size: 1rem;
 }
 
 .set-button:hover {
@@ -558,138 +426,222 @@ tr:hover {
   color: #2d2d44;
 }
 
-/* Heading columns for "Current" and "Set To" */
 .heading-col {
-  text-align: center; /* Center text within the grid cell */
+  text-align: center;
   font-weight: bold;
-  font-size: 1.1rem; /* Slightly larger font if desired */
+  font-size: 1.1rem;
   margin-right: 70px;
 }
 
-/* Container for the alert section */
-.alert-container {
+/* AUTOMATION CONTAINER */
+.automation-container {
   max-width: 1200px;
   margin: 2rem auto;
   padding: 2rem;
   background-color: #2d2d44;
   border-radius: 8px;
+  text-align: center;
 }
 
-.alert-grid-4col {
+.automation-purpose {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.automation-top-select {
+  margin-bottom: 1rem;
+}
+
+.automation-select-label {
+  margin-right: 10px;
+}
+
+/* 
+   We define a 2-row grid here:
+   Row 1: name, type, date/threshold, action 
+   Row 2: empty, enabled, repeat, empty
+*/
+.automation-grid-4col {
   display: grid;
-  grid-template-columns: 2fr 2fr 2fr 2fr; 
+  grid-template-columns: 2fr 2fr 2fr 2fr; /* 4 columns */
+  grid-template-rows: auto auto;          /* 2 rows: first for main form, second for enabled/repeat */
   column-gap: 1rem;
   row-gap: 1rem;
-  align-items: start; /* top-align columns */
+  align-items: start;
+  margin-top: 10px;
 }
 
-/* Common label styling for steps (e.g., "1. Create/Update Alert Name") */
-.alert-step {
+.automation-left,
+.automation-middle,
+.automation-right,
+.automation-saved {
+  /* Shared style for the 1st row's 4 columns */
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
+}
+
+.automation-left-empty {
+  /* 2nd row, col 1: empty */
+}
+
+.automation-middle-enabled {
+  /* 2nd row, col 2: "Enabled?" */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.automation-right-repeat {
+  /* 2nd row, col 3: "Repeat" */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+.automation-saved-empty {
+  /* 2nd row, col 4: empty */
+}
+
+.automation-step {
   margin-bottom: 0.5rem;
   margin-left: 5px;
 }
 
-.alert-right-label {
-  margin-left: 30px;
+.automation-select-block {
+  margin-top: 1px;
 }
 
-.alert-last-label {
-  margin-left: 65px;
+/* for "Enabled?" label in row 2, col 2 */
+.automation-enabled-label {
+  margin-right: 10px;
+  margin-bottom: 0px;
 }
 
-/* Left column items */
-.alert-left .alert-name-row {
-  display: center;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 30px;
+/* for "Repeat" label in row 2, col 3 */
+.automation-repeat-label {
+  margin-right: 5px;
 }
 
-.alert-middle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.alert-name-input {
+.automation-name-input {
   padding: 5px;
   border-radius: 4px;
   border: 1px solid #8ecae6;
   background-color: #1e1e2f;
   color: #ffffff;
-  margin-left: 40px;
-  margin-top: 20px;
+  margin-left: 10px;
+  margin-top: 21px;
+  width: 150px;
 }
 
-/* Middle column items */
-.alert-datetime-input {
-  margin-top: 40px;
-  margin-left: 5px;
-  padding: 5px;
-  border-radius: 4px;
-  border: 1px solid #8ecae6;
-  background-color: #1e1e2f;
-  color: #ffffff;
+/* The date/time or threshold fields */
+.automation-label-margin {
+  margin-top: 0rem;
 }
 
-/* Right column items */
-.alert-right .alert-buttons {
-  display: flex;
-  flex-direction: column; /* vertical stacking for the two buttons */
-  gap: 1rem;
-  margin-top: 29px; 
-  margin-right: 30px;
-}
-
-/* Example styling for the two new alert buttons */
-.alert-buttons button {
-  padding: 5px 10px;
-  border: 1px solid #8ecae6;
-  border-radius: 4px;
-  background-color: #2d2d44;
-  color: #ffffff;
-  cursor: pointer;
-}
-.alert-buttons button:hover {
-  background-color: #8ecae6;
-  color: #2d2d44;
-}
-
-.alert-buttons button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 4th column: "Saved Alert(s)" + dropdown + "Clear Alerts" */
-.alert-saved {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* The dropdown for saved alerts */
-.alert-dropdown {
+.automation-dropdown {
   padding: 5px;
   border-radius: 4px;
   border: 1px solid #8ecae6;
   background-color: #1e1e2f;
   color: #ffffff;
   margin-right: 5px;
+  margin-top: 18px;
 }
 
-/* The clear button below the dropdown */
-.alert-clear-button {
-  padding: 5px 10px;
-  align-self: flex-start;  /* keep it left-aligned */
-  border: 1px solid #8ecae6;
+.automation-dropdown-time {
+  padding: 5px;
   border-radius: 4px;
-  background-color: #2d2d44;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
   color: #ffffff;
-  cursor: pointer;
-  margin-top: 0.5rem;
-  margin-left: 70px;
+  margin-bottom: 20px;
 }
-.alert-clear-button:hover {
-  background-color: #8ecae6;
-  color: #2d2d44;
+
+.automation-select-margin {
+  margin-top: 0.5rem;
+}
+
+.automation-action-buttons-container {
+  margin-top: 1rem;
+}
+
+.automation-space-right {
+  margin-right: 5px;
+}
+
+.automation-existing-list {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.automation-item-row {
+  display: flex;
+  justify-content: space-between;
+  background: #3a3a55;
+  padding: 8px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+}
+
+.automation-toggle-button {
+  margin-right: 10px;
+}
+
+.automation-clear-button {
+  margin-top: 1rem;
+}
+
+/* Additional radio label spacing for booleans */
+.automation-radio-label {
+  margin-right: 1rem;
+  margin-top: 0.5rem;
+}
+
+.automation-datetime-input {
+  margin-top: 18px;
+  margin-left: 5px;
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+}
+
+/* Dashboard Automations Container */
+.dashboard-automations-container {
+  background-color: #2d2d44;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 22px;
+  text-align: center;
+  width: 100%;
+  max-width: 900px;
+}
+
+/* Table for upcoming automations */
+.upcoming-automations-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.upcoming-automations-table th,
+.upcoming-automations-table td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: left;
+  font-size: 1rem;
+}
+
+.upcoming-automations-table th {
+  background: #3a3a55;
+  color: #8ecae6;
+}
+
+.upcoming-automations-table tr:hover {
+  background: rgba(255, 255, 255, 0.1);
 }

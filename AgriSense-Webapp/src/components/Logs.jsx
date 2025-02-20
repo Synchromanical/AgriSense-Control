@@ -1,3 +1,4 @@
+// src/components/Logs.jsx
 import React, { useEffect, useState, useRef } from "react";
 import {
   collection,
@@ -6,10 +7,16 @@ import {
   orderBy,
   doc,
   deleteDoc,
-  addDoc,
-  Timestamp
+  addDoc
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+
+// Helper to produce a string timestamp
+function getTimestampString(date = new Date()) {
+  const iso = date.toISOString();
+  const [withoutMillis] = iso.split(".");
+  return withoutMillis + "Z";
+}
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
@@ -32,25 +39,17 @@ const Logs = () => {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
 
-        // Convert Firestore timestamp to JS Date
+        // Convert string timestamp to JS Date
         let timeObj;
-        if (data.timestamp && data.timestamp.toDate) {
-          // If it's a Firestore Timestamp
-          timeObj = data.timestamp.toDate();
-        } else if (data.timestamp) {
-          // If it's a plain date string or Date object
+        if (data.timestamp && typeof data.timestamp === "string") {
           timeObj = new Date(data.timestamp);
         } else {
-          // If no timestamp, fallback
           timeObj = new Date(0);
         }
 
-        // Format time as a string
         const timeDisplay = timeObj.toLocaleString();
 
-        // For each sensor field, create a separate log line
-        // The user wants "Reading of Temperature: 21", etc.
-        // Adjust or remove any fields you don't want to display.
+        // Add new "Fan State" etc. to the sensor fields
         const sensorFields = [
           { label: "Temperature", value: data.temperature },
           { label: "Humidity", value: data.humidity },
@@ -58,25 +57,21 @@ const Logs = () => {
           { label: "Light", value: data.light },
           { label: "Water Level", value: data.waterLevel },
           { label: "Light State", value: data.lightState },
+          { label: "Fan State", value: data.fanState },
         ];
 
         sensorFields.forEach((field) => {
-          // Only create a log if there's a defined value
           if (field.value !== undefined && field.value !== null) {
-            const actionString = `Reading of ${field.label}: ${field.value}`;
             newLogs.push({
-              // We'll assign an integer ID later
               time: timeObj,
               timeDisplay,
-              action: actionString,
+              action: `Reading of ${field.label}: ${field.value}`,
             });
           }
         });
       });
 
-      // Now newLogs is in ascending order by doc timestamp
-      // But we have multiple lines per doc
-      // Assign a simple integer ID from earliest to latest
+      // lines are ascending
       newLogs.forEach((log, idx) => {
         log.id = idx + 1;
       });
@@ -91,7 +86,7 @@ const Logs = () => {
   // 2) FILTERING: time range & text search
   // ----------------------------------------------------------------
   const filteredLogs = logs.filter((log) => {
-    // Text filter (by ID or Action)
+    // Text filter
     const textMatch =
       searchTerm === "" ||
       log.id.toString().includes(searchTerm) ||
@@ -171,7 +166,6 @@ const Logs = () => {
   };
 
   // Import logs from JSON
-  // For demonstration, we add them to Firestore as new docs
   const handleImportLogs = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -180,7 +174,8 @@ const Logs = () => {
       try {
         const imported = JSON.parse(event.target.result);
         for (const item of imported) {
-          const time = item.time ? new Date(item.time) : new Date();
+          const stringTime = item.time ? item.time : getTimestampString();
+
           await addDoc(collection(db, "sensorData"), {
             temperature: 0,
             humidity: 0,
@@ -188,8 +183,8 @@ const Logs = () => {
             light: 0,
             waterLevel: 0,
             lightState: false,
-            // We'll store a Firestore Timestamp, or you could store a Date object
-            timestamp: time ? Timestamp.fromDate(time) : new Date()
+            fanState: false,
+            timestamp: stringTime,
           });
         }
       } catch (error) {
@@ -199,7 +194,7 @@ const Logs = () => {
     reader.readAsText(file);
   };
 
-  // Clear logs from Firestore: delete all docs in sensorData
+  // Clear logs from Firestore
   const handleClearLogs = async () => {
     try {
       const snap = await import("firebase/firestore").then(({ getDocs }) =>
@@ -220,7 +215,6 @@ const Logs = () => {
     <div className="content">
       <h2>All Logs</h2>
       <div className="logs-container">
-
         {/* Filters */}
         <div className="logs-filters">
           {/* Time range */}

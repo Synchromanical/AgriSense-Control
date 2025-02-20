@@ -7,7 +7,7 @@ import "chart.js/auto";
 
 const Graph = () => {
   const [sensorData, setSensorData] = useState([]);
-  const [selectedField, setSelectedField] = useState("all"); // "humidity", "temperature", etc.
+  const [selectedField, setSelectedField] = useState("all");
 
   useEffect(() => {
     const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
@@ -37,9 +37,7 @@ const Graph = () => {
 
   sensorData.forEach((entry) => {
     let ts = entry.timestamp;
-    if (ts && ts.toDate) {
-      ts = ts.toDate();
-    } else if (ts) {
+    if (ts && typeof ts === "string") {
       ts = new Date(ts);
     } else {
       ts = new Date(0);
@@ -72,7 +70,7 @@ const Graph = () => {
     soilMoisture: "rgba(75, 192, 192, 1)",
   };
 
-  // Build chartData depending on selectedField
+  // Build chartData
   let chartData;
   if (selectedField === "all") {
     chartData = {
@@ -145,7 +143,6 @@ const Graph = () => {
     };
   }
 
-  // Chart options
   const chartOptions = {
     responsive: true,
     plugins: {
