@@ -5,6 +5,8 @@ import { db } from "../firebaseConfig";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 
+import styles from "../Graph.module.css";
+
 const Graph = () => {
   const [sensorData, setSensorData] = useState([]);
   const [selectedField, setSelectedField] = useState("all");
@@ -28,7 +30,7 @@ const Graph = () => {
     return () => unsub();
   }, []);
 
-  // Build separate arrays
+  // Build arrays
   const timestamps = [];
   const humidityData = [];
   const temperatureData = [];
@@ -179,10 +181,10 @@ const Graph = () => {
   };
 
   return (
-    <div className="content">
+    <div className={styles.content}>
       <h2>Sensor Data Over Time</h2>
 
-      <div className="graph-panel">
+      <div className={styles.graphPanel}>
         <label>Select Data Type: </label>
         <select
           value={selectedField}
@@ -195,7 +197,7 @@ const Graph = () => {
           <option value="soilMoisture">Soil Moisture (%)</option>
         </select>
 
-        <div className="graph-container">
+        <div className={styles.graphContainer}>
           <Line data={chartData} options={chartOptions} />
         </div>
       </div>

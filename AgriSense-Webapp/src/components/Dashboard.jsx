@@ -1,16 +1,8 @@
 // src/components/Dashboard.jsx
 import React, { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  doc,
-  getDocs,
-  where,
-} from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, addDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import styles from "../Dashboard.module.css";
 
 /** Utility to format numeric values to 1 decimal place */
 function formatOneDecimal(value) {
@@ -30,22 +22,19 @@ function getTimestampString(date = new Date()) {
 }
 
 /**
- * Compute the next occurrence date for a time-based automation,
- * taking into account repeatSchedule. Returns `null` if there's
- * no upcoming occurrence (e.g. past date with no repeat).
+ * Example function that calculates "next occurrence" 
+ * for a time-based automation if you want that logic,
+ * or you can omit this if you already have it.
  */
 function computeNextOccurrence(automation) {
-  // Only handle time-based & enabled
   if (automation.type !== "time-based" || !automation.enabled) return null;
-
-  // Must have a valid dateTime
   if (!automation.dateTime) return null;
+
   const baseDate = new Date(automation.dateTime);
   if (isNaN(baseDate.getTime())) return null;
 
   const now = new Date();
 
-  // Local helper to add days
   function addDays(date, days) {
     const copy = new Date(date);
     copy.setDate(copy.getDate() + days);
@@ -54,27 +43,20 @@ function computeNextOccurrence(automation) {
 
   let next = new Date(baseDate);
 
-  // Up to 50 iterations as a safeguard (to avoid infinite loops)
   for (let i = 0; i < 50; i++) {
     if (next >= now) {
-      // Found a future date/time
       return next;
     }
-
-    // If next < now, handle repeats
     if (automation.repeatSchedule === "none") {
-      // No further repeats
       return null;
     } else if (automation.repeatSchedule === "daily") {
       next = addDays(next, 1);
     } else if (automation.repeatSchedule === "weekly") {
       next = addDays(next, 7);
     } else {
-      // Unrecognized repeat type
       return null;
     }
   }
-  // If we somehow never found a future date
   return null;
 }
 
@@ -91,12 +73,11 @@ function Dashboard() {
   });
 
   const [dashboardLogs, setDashboardLogs] = useState([]);
-
-  // -- New: store the top 3 upcoming automations
+  // If you’re displaying upcoming automations, store them here
   const [upcomingAutomations, setUpcomingAutomations] = useState([]);
 
+  // 1) Real-time sensorData
   useEffect(() => {
-    // Real-time subscription to entire sensorData, ordered ascending
     const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((doc) => ({
@@ -178,7 +159,7 @@ function Dashboard() {
     return () => unsubscribe();
   }, []);
 
-  // Only a simple Light On/Off example
+  // Simple Light On/Off example
   const handleLightStateChange = async (e) => {
     const val = e.target.value === "true";
     const newDoc = {
@@ -191,7 +172,6 @@ function Dashboard() {
       fanState: latestData.fanState,
       timestamp: getTimestampString(),
     };
-
     try {
       await addDoc(collection(db, "sensorData"), newDoc);
     } catch (error) {
@@ -199,52 +179,47 @@ function Dashboard() {
     }
   };
 
-  // ----------------------------------------------------------------
-  // NEW: Subscribe to automations and compute top 3 upcoming
-  // ----------------------------------------------------------------
+  // 2) Optional: subscribe to automations & compute next occurrences
   useEffect(() => {
-    const automationsRef = collection(db, "automations");
-    const unsub = onSnapshot(automationsRef, (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
-
-      // Filter time-based, enabled, find nextOccurrence
-      const upcoming = [];
-
-      docs.forEach((auto) => {
-        const next = computeNextOccurrence(auto);
-        if (next) {
-          upcoming.push({
-            ...auto,
-            nextOccurrence: next,
+    // If you want to show upcoming automations on the dashboard
+    import("firebase/firestore")
+      .then(({ onSnapshot }) => {
+        const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
+          const docs = snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }));
+          const upcoming = [];
+          docs.forEach((auto) => {
+            const next = computeNextOccurrence(auto);
+            if (next) {
+              upcoming.push({
+                ...auto,
+                nextOccurrence: next,
+              });
+            }
           });
-        }
-      });
-
-      // Sort by nextOccurrence ascending
-      upcoming.sort((a, b) => a.nextOccurrence - b.nextOccurrence);
-
-      // Only take first 3
-      const top3 = upcoming.slice(0, 3);
-
-      setUpcomingAutomations(top3);
-    });
-
-    return () => unsub();
+          upcoming.sort((a, b) => a.nextOccurrence - b.nextOccurrence);
+          const top3 = upcoming.slice(0, 3);
+          setUpcomingAutomations(top3);
+        });
+        return unsub;
+      })
+      .catch((err) => console.error(err));
   }, []);
 
   return (
-    <div className="content">
+    <div className={styles.content}>
       <h2>Dashboard</h2>
-      <div className="dashboard-container">
+
+      {/* Left/Right: sensor data + logs */}
+      <div className={styles.dashboardContainer}>
         {/* LEFT: LATEST SENSOR DATA */}
-        <div className="sensor-data-container">
-          <div className="sensor-data">
+        <div className={styles.sensorDataContainer}>
+          <div className={styles.sensorData}>
             <h3>Latest Sensor Data</h3>
 
-            <div className="sensor-row">
+            <div className={styles.sensorRow}>
               <label>
                 <strong>Temperature:</strong>
               </label>
@@ -252,12 +227,12 @@ function Dashboard() {
                 type="number"
                 value={latestData.temperature}
                 readOnly
-                className="sensor-input"
+                className={styles.sensorInput}
               />
               °C
             </div>
 
-            <div className="sensor-row">
+            <div className={styles.sensorRow}>
               <label>
                 <strong>Humidity:</strong>
               </label>
@@ -265,12 +240,12 @@ function Dashboard() {
                 type="number"
                 value={latestData.humidity}
                 readOnly
-                className="sensor-input"
+                className={styles.sensorInput}
               />
               %
             </div>
 
-            <div className="sensor-row">
+            <div className={styles.sensorRow}>
               <label>
                 <strong>Soil Moisture:</strong>
               </label>
@@ -278,12 +253,12 @@ function Dashboard() {
                 type="number"
                 value={latestData.soilMoisture}
                 readOnly
-                className="sensor-input"
+                className={styles.sensorInput}
               />
               %
             </div>
 
-            <div className="sensor-row">
+            <div className={styles.sensorRow}>
               <label>
                 <strong>Water Level:</strong>
               </label>
@@ -291,12 +266,12 @@ function Dashboard() {
                 type="number"
                 value={latestData.waterLevel}
                 readOnly
-                className="sensor-input"
+                className={styles.sensorInput}
               />
               %
             </div>
 
-            <div className="sensor-row">
+            <div className={styles.sensorRow}>
               <label>
                 <strong>Light:</strong>
               </label>
@@ -304,16 +279,16 @@ function Dashboard() {
                 type="number"
                 value={latestData.light}
                 readOnly
-                className="sensor-input"
+                className={styles.sensorInput}
               />
               lux
             </div>
 
-            <div className="sensor-row">
+            <div className={styles.sensorRow}>
               <label>
                 <strong>Light State:</strong>
               </label>
-              <div className="radio-group">
+              <div className={styles.radioGroup}>
                 <label>
                   <input
                     type="radio"
@@ -340,28 +315,28 @@ function Dashboard() {
         </div>
 
         {/* RIGHT: Last 5 logs */}
-        <div className="dashboard-logs-container">
+        <div className={styles.dashboardLogsContainer}>
           <h3>Latest Logs</h3>
-          <table className="logs-table">
+          <table className={styles.logsTable}>
             <thead>
               <tr>
-                <th className="logs-th">ID</th>
-                <th className="logs-th">Time</th>
-                <th className="logs-th">Action</th>
+                <th className={styles.logsTh}>ID</th>
+                <th className={styles.logsTh}>Time</th>
+                <th className={styles.logsTh}>Action</th>
               </tr>
             </thead>
             <tbody>
               {dashboardLogs.length > 0 ? (
                 dashboardLogs.map((log) => (
                   <tr key={log.id}>
-                    <td className="logs-td">{log.id}</td>
-                    <td className="logs-td">{log.timeDisplay}</td>
-                    <td className="logs-td">{log.action}</td>
+                    <td className={styles.logsTd}>{log.id}</td>
+                    <td className={styles.logsTd}>{log.timeDisplay}</td>
+                    <td className={styles.logsTd}>{log.action}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="logs-td" colSpan="3">
+                  <td className={styles.logsTd} colSpan="3">
                     No logs available
                   </td>
                 </tr>
@@ -372,12 +347,12 @@ function Dashboard() {
       </div>
 
       {/* NEW SECTION: Upcoming Automations */}
-      <div className="dashboard-automations-container">
+      <div className={styles.dashboardAutomationsContainer}>
         <h3>Upcoming Automations</h3>
         {upcomingAutomations.length === 0 ? (
           <p>No upcoming time-based automations.</p>
         ) : (
-          <table className="upcoming-automations-table">
+          <table className={styles.upcomingAutomationsTable}>
             <thead>
               <tr>
                 <th>Name</th>

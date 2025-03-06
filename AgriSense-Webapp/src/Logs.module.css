@@ -1,0 +1,177 @@
+/* Logs.module.css */
+
+/* Optional: replicate the .content */
+.content {
+    padding-top: 25px; 
+    max-width: 1200px;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  
+  /* Outer container for logs */
+  .logsContainer {
+    margin-top: 20px;
+    width: 80%;
+    max-height: 500px;
+    overflow-y: auto;
+    border-radius: 8px;
+    padding: 10px;
+    background-color: #2d2d44;
+    font-size: 1rem;
+  }
+  
+  /* Logs filters section (time range, search) */
+  .logsFilters {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  
+  .logsTimeSearch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .logsTimeTitle {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #ffffff;
+    font-size: 1rem;
+  }
+  
+  .logsTimeInputs {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  
+  .logsTimeGroup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .logsTimeLabel {
+    margin-bottom: 3px;
+    font-size: 1rem;
+    color: #ffffff;
+  }
+  
+  .logsTimeInput {
+    padding: 5px;
+    border: 1px solid #8ecae6;
+    border-radius: 4px;
+    background-color: #2d2d44;
+    color: #ffffff;
+  }
+  
+  .logsTextSearch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 220px;
+    text-align: center;
+  }
+  
+  .logsSearchLabel {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #ffffff;
+    font-size: 1rem;
+  }
+  
+  .logsSearch {
+    width: 200px;
+    padding: 5px;
+    border: 1px solid #8ecae6;
+    border-radius: 4px;
+    background-color: #2d2d44;
+    color: #ffffff;
+  }
+  
+  /* Table styling */
+  .logsTable {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    color: #ffffff;
+  }
+  
+  .logsTable th,
+  .logsTable td {
+    padding: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 1rem;
+  }
+  
+  .logsTable th {
+    background: #3a3a55;
+    font-size: 1.1rem;
+  }
+  
+  .logsTable tr:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Pagination */
+  .paginationContainer {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1rem;
+  }
+  
+  .paginationButton {
+    margin: 0 5px;
+    padding: 5px 10px;
+    background-color: #2d2d44;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  
+  .paginationButton.active {
+    background-color: #8ecae6;
+    color: #2d2d44;
+  }
+  
+  .paginationButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  /* Action buttons: import/export/clear */
+  .logsActionButtons {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 10px;
+  }
+  
+  .logsButtons {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .logsButton,
+  .clearLogsButton {
+    padding: 5px 10px;
+    border: 1px solid #8ecae6;
+    border-radius: 4px;
+    background-color: #2d2d44;
+    color: #ffffff;
+    cursor: pointer;
+  }
+  

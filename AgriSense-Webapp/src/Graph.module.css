@@ -1,0 +1,44 @@
+/* Graph.module.css */
+
+/* Optional: replicate or omit .content as needed */
+.content {
+    padding-top: 25px; 
+    max-width: 1200px;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  
+  /* Graph panel wrapper */
+  .graphPanel {
+    background-color: #2d2d44;
+    border-radius: 8px;
+    padding: 25px;
+    margin-top: 22px;
+    width: 100%;
+    max-width: 1000px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  /* Container for the chart */
+  .graphContainer {
+    width: 100%;
+    max-width: 1000px;
+    height: 500px;
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  /* Force canvas to fill container */
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  

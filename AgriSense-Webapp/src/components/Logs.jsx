@@ -7,9 +7,11 @@ import {
   orderBy,
   doc,
   deleteDoc,
-  addDoc
+  addDoc,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+
+import styles from "../Logs.module.css";
 
 // Helper to produce a string timestamp
 function getTimestampString(date = new Date()) {
@@ -28,9 +30,7 @@ const Logs = () => {
 
   const logsPerPage = 25;
 
-  // ----------------------------------------------------------------
-  // 1) REAL-TIME LISTENER: sensorData, ORDER ASC
-  // ----------------------------------------------------------------
+  // 1) REAL-TIME LISTENER
   useEffect(() => {
     const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -82,17 +82,13 @@ const Logs = () => {
     return () => unsub();
   }, []);
 
-  // ----------------------------------------------------------------
-  // 2) FILTERING: time range & text search
-  // ----------------------------------------------------------------
+  // 2) FILTERING
   const filteredLogs = logs.filter((log) => {
-    // Text filter
     const textMatch =
       searchTerm === "" ||
       log.id.toString().includes(searchTerm) ||
       log.action.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Time filter
     let timeMatch = true;
     if (startTime) {
       const startDate = new Date(startTime);
@@ -111,9 +107,7 @@ const Logs = () => {
     setCurrentPage(1);
   }, [searchTerm, startTime, endTime]);
 
-  // ----------------------------------------------------------------
   // 3) PAGINATION
-  // ----------------------------------------------------------------
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
   const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);
@@ -134,7 +128,9 @@ const Logs = () => {
         <button
           key={i}
           onClick={() => setCurrentPage(i)}
-          className={`pagination-button ${currentPage === i ? "active" : ""}`}
+          className={`${styles.paginationButton} ${
+            currentPage === i ? styles.active : ""
+          }`}
         >
           {i}
         </button>
@@ -143,9 +139,7 @@ const Logs = () => {
     return pages;
   };
 
-  // ----------------------------------------------------------------
   // 4) IMPORT / EXPORT / CLEAR
-  // ----------------------------------------------------------------
   // Export logs as JSON
   const handleExportLogs = () => {
     const exportData = logs.map((log) => ({
@@ -208,21 +202,19 @@ const Logs = () => {
     }
   };
 
-  // ----------------------------------------------------------------
-  // 5) RENDER
-  // ----------------------------------------------------------------
   return (
-    <div className="content">
+    <div className={styles.content}>
       <h2>All Logs</h2>
-      <div className="logs-container">
+
+      <div className={styles.logsContainer}>
         {/* Filters */}
-        <div className="logs-filters">
+        <div className={styles.logsFilters}>
           {/* Time range */}
-          <div className="logs-time-search">
-            <div className="logs-time-title">Search Between</div>
-            <div className="logs-time-inputs">
-              <div className="logs-time-group">
-                <label htmlFor="startTime" className="logs-time-label">
+          <div className={styles.logsTimeSearch}>
+            <div className={styles.logsTimeTitle}>Search Between</div>
+            <div className={styles.logsTimeInputs}>
+              <div className={styles.logsTimeGroup}>
+                <label htmlFor="startTime" className={styles.logsTimeLabel}>
                   Start
                 </label>
                 <input
@@ -230,11 +222,11 @@ const Logs = () => {
                   id="startTime"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="logs-time-input"
+                  className={styles.logsTimeInput}
                 />
               </div>
-              <div className="logs-time-group">
-                <label htmlFor="endTime" className="logs-time-label">
+              <div className={styles.logsTimeGroup}>
+                <label htmlFor="endTime" className={styles.logsTimeLabel}>
                   End
                 </label>
                 <input
@@ -242,15 +234,15 @@ const Logs = () => {
                   id="endTime"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="logs-time-input"
+                  className={styles.logsTimeInput}
                 />
               </div>
             </div>
           </div>
 
           {/* Search text */}
-          <div className="logs-text-search">
-            <label htmlFor="logsSearch" className="logs-search-label">
+          <div className={styles.logsTextSearch}>
+            <label htmlFor="logsSearch" className={styles.logsSearchLabel}>
               Search
             </label>
             <input
@@ -259,34 +251,32 @@ const Logs = () => {
               placeholder="Search by ID or Action..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="logs-search"
+              className={styles.logsSearch}
             />
           </div>
         </div>
 
         {/* Table */}
-        <table className="logs-table">
+        <table className={styles.logsTable}>
           <thead>
             <tr>
-              <th className="logs-th">ID</th>
-              <th className="logs-th">Time</th>
-              <th className="logs-th">Action</th>
+              <th>ID</th>
+              <th>Time</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {currentLogs.length > 0 ? (
               currentLogs.map((log) => (
                 <tr key={log.id}>
-                  <td className="logs-td">{log.id}</td>
-                  <td className="logs-td">{log.timeDisplay}</td>
-                  <td className="logs-td">{log.action}</td>
+                  <td>{log.id}</td>
+                  <td>{log.timeDisplay}</td>
+                  <td>{log.action}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="logs-td" colSpan="3">
-                  No logs available
-                </td>
+                <td colSpan="3">No logs available</td>
               </tr>
             )}
           </tbody>
@@ -294,14 +284,14 @@ const Logs = () => {
       </div>
 
       {/* Import/Export/Clear */}
-      <div className="logs-action-buttons">
-        <div className="logs-buttons">
-          <button onClick={handleExportLogs} className="logs-button">
+      <div className={styles.logsActionButtons}>
+        <div className={styles.logsButtons}>
+          <button onClick={handleExportLogs} className={styles.logsButton}>
             Export Logs
           </button>
           <button
             onClick={() => fileInputRef.current.click()}
-            className="logs-button"
+            className={styles.logsButton}
           >
             Import Logs
           </button>
@@ -313,8 +303,8 @@ const Logs = () => {
             accept=".json"
           />
         </div>
-        <div className="clear-logs-container">
-          <button onClick={handleClearLogs} className="clear-logs-button">
+        <div>
+          <button onClick={handleClearLogs} className={styles.clearLogsButton}>
             Clear Logs
           </button>
         </div>
@@ -322,11 +312,11 @@ const Logs = () => {
 
       {/* Pagination */}
       {filteredLogs.length > logsPerPage && (
-        <div className="pagination-container">
+        <div className={styles.paginationContainer}>
           <button
             onClick={handlePrevPage}
             disabled={currentPage === 1}
-            className="pagination-button"
+            className={styles.paginationButton}
           >
             Previous
           </button>
@@ -334,7 +324,7 @@ const Logs = () => {
           <button
             onClick={handleNextPage}
             disabled={currentPage === totalPages}
-            className="pagination-button"
+            className={styles.paginationButton}
           >
             Next
           </button>

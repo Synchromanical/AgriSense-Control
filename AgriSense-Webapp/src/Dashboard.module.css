@@ -1,0 +1,144 @@
+/* Dashboard.module.css */
+
+/* Optional: replicate the .content style if desired. 
+   (You may have removed it if using your App.module.css container.)
+*/
+.content {
+    padding-top: 25px;
+    max-width: 1200px;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  
+  /* The main container that holds sensor info + logs (left/right) */
+  .dashboardContainer {
+    display: flex;
+    gap: 150px;
+  }
+  
+  /* Left side with sensor data */
+  .sensorDataContainer {
+    flex: 2;
+  }
+  
+  .sensorData {
+    background: #2d2d44;
+    border-radius: 10px;
+    padding: 25px;
+    width: 120%;
+    max-width: 600px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    margin-top: 20px;
+  }
+  
+  .sensorData p {
+    font-size: 1.2rem;
+    padding: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .sensorData p:last-child {
+    border-bottom: none;
+  }
+  
+  /* Row for sensor fields */
+  .sensorRow {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .sensorRow label {
+    margin-right: 10px;
+  }
+  
+  .sensorInput {
+    width: 75px;
+    padding: 4px;
+    margin-right: 5px;
+    text-align: center;
+  }
+  
+  .radioGroup {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px;
+    margin-left: 65px;
+  }
+  
+  .radioGroup input[type="radio"] {
+    margin-right: 5px;
+  }
+  
+  /* Right side logs preview */
+  .dashboardLogsContainer {
+    flex: 3;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #2d2d44;
+    height: 330px;
+    margin-top: 22px;
+    text-align: center;
+  }
+  
+  .logsTable {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .logsTh {
+    padding: 10px;
+    border-bottom: 2px solid #8ecae6;
+    color: #ffffff;
+    text-align: left;
+    font-size: 1rem;
+  }
+  
+  .logsTd {
+    padding: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.33);
+    color: #ffffff;
+    font-size: 0.9rem;
+  }
+  
+  /* Upcoming Automations section */
+  .dashboardAutomationsContainer {
+    background-color: #2d2d44;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 22px;
+    text-align: center;
+    width: 100%;
+    max-width: 960px;
+  }
+  
+  /* Table for upcoming automations */
+  .upcomingAutomationsTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  
+  .upcomingAutomationsTable th,
+  .upcomingAutomationsTable td {
+    padding: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    text-align: left;
+    font-size: 1rem;
+  }
+  
+  .upcomingAutomationsTable th {
+    background: #3a3a55;
+    color: #8ecae6;
+  }
+  
+  .upcomingAutomationsTable tr:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  

@@ -12,6 +12,7 @@ import {
   deleteDoc
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import styles from "../ControlPanel.module.css";
 
 // Utility to format numeric values to 1 decimal place
 function formatOneDecimal(value) {
@@ -61,19 +62,17 @@ const ControlPanel = () => {
   // Form data for creating/updating an automation
   const [automationForm, setAutomationForm] = useState({
     name: "",
-    type: "time-based",       // "time-based" or "threshold-based"
+    type: "time-based",
     enabled: true,
     dateTime: "",
-    repeatSchedule: "none",   // e.g. "none", "daily", "weekly"
-    sensorField: "temperature", // For threshold-based
-    operator: ">",            // For threshold-based: "<", ">", "="
+    repeatSchedule: "none",
+    sensorField: "temperature",
+    operator: ">",
     thresholdValue: "",
-    action: "turnFanOn",      // e.g. "fillWater", "turnFanOn", etc.
+    action: "turnFanOn",
   });
 
-  // ----------------------------------------------------------------
-  // 1) REAL-TIME LISTENER FOR LATEST SENSOR DATA (limit 1, desc)
-  // ----------------------------------------------------------------
+  // 1) REAL-TIME LISTENER FOR LATEST SENSOR DATA
   useEffect(() => {
     const sensorCollection = collection(db, "sensorData");
     const q = query(sensorCollection, orderBy("timestamp", "desc"), limit(1));
@@ -109,9 +108,7 @@ const ControlPanel = () => {
     return () => unsubscribe();
   }, []);
 
-  // ----------------------------------------------------------------
   // 2) REAL-TIME LISTENER FOR AUTOMATIONS
-  // ----------------------------------------------------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
       const fetched = [];
@@ -123,9 +120,7 @@ const ControlPanel = () => {
     return () => unsub();
   }, []);
 
-  // ----------------------------------------------------------------
-  // 3) CREATE A NEW READING DOC (merging updated fields)
-  // ----------------------------------------------------------------
+  // 3) CREATE A NEW READING DOC
   async function createNewReading(updatedFields) {
     const mergedData = {
       temperature:
@@ -145,7 +140,7 @@ const ControlPanel = () => {
         typeof updatedFields.fanState === "boolean"
           ? updatedFields.fanState
           : latestData.fanState,
-      timestamp: getTimestampString()
+      timestamp: getTimestampString(),
     };
 
     try {
@@ -155,9 +150,7 @@ const ControlPanel = () => {
     }
   }
 
-  // ----------------------------------------------------------------
   // 4) HANDLERS FOR “SET” & “SET ALL”
-  // ----------------------------------------------------------------
   const handleKeyDown = (e) => {
     const allowedKeys = [
       "ArrowUp",
@@ -198,9 +191,7 @@ const ControlPanel = () => {
     await createNewReading({ waterLevel: 100 });
   };
 
-  // ----------------------------------------------------------------
   // 5) AUTOMATIONS CRUD
-  // ----------------------------------------------------------------
   const handleAutomationFormChange = (field, value) => {
     setAutomationForm((prev) => ({
       ...prev,
@@ -344,37 +335,34 @@ const ControlPanel = () => {
     }
   };
 
-  // ----------------------------------------------------------------
-  // 6) RENDER
-  // ----------------------------------------------------------------
   return (
-    <div className="content">
+    <div className={styles.content}>
       <h2>Control Panel</h2>
 
       {/* SENSOR CONTROL SECTION */}
-      <div className="control-panel-container">
+      <div className={styles.controlPanelContainer}>
         <h3>Sensor Control</h3>
-        <div className="control-panel-grid">
+        <div className={styles.controlPanelGrid}>
           {/* Header row */}
           <div></div>
-          <div className="heading-col">Current</div>
-          <div className="heading-col">Set To</div>
+          <div className={styles.headingCol}>Current</div>
+          <div className={styles.headingCol}>Set To</div>
           <div></div>
 
           {/* Temperature row */}
-          <div className="row-label">
+          <div className={styles.rowLabel}>
             <strong>Temperature:</strong>
           </div>
-          <div className="row-latest">
+          <div className={styles.rowLatest}>
             <input
               type="number"
               value={latestData.temperature}
               readOnly
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">°C</span>
+            <span className={styles.unit}>°C</span>
           </div>
-          <div className="row-edited">
+          <div className={styles.rowEdited}>
             <input
               type="number"
               value={editedData.temperature}
@@ -382,30 +370,33 @@ const ControlPanel = () => {
                 setEditedData((prev) => ({ ...prev, temperature: e.target.value }))
               }
               onKeyDown={handleKeyDown}
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">°C</span>
+            <span className={styles.unit}>°C</span>
           </div>
-          <div className="row-set">
-            <button onClick={() => handleSetSensor("temperature")} className="set-button">
+          <div className={styles.rowSet}>
+            <button
+              onClick={() => handleSetSensor("temperature")}
+              className={styles.setButton}
+            >
               Set
             </button>
           </div>
 
           {/* Humidity row */}
-          <div className="row-label">
+          <div className={styles.rowLabel}>
             <strong>Humidity:</strong>
           </div>
-          <div className="row-latest">
+          <div className={styles.rowLatest}>
             <input
               type="number"
               value={latestData.humidity}
               readOnly
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">%</span>
+            <span className={styles.unit}>%</span>
           </div>
-          <div className="row-edited">
+          <div className={styles.rowEdited}>
             <input
               type="number"
               value={editedData.humidity}
@@ -413,30 +404,33 @@ const ControlPanel = () => {
                 setEditedData((prev) => ({ ...prev, humidity: e.target.value }))
               }
               onKeyDown={handleKeyDown}
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">%</span>
+            <span className={styles.unit}>%</span>
           </div>
-          <div className="row-set">
-            <button onClick={() => handleSetSensor("humidity")} className="set-button">
+          <div className={styles.rowSet}>
+            <button
+              onClick={() => handleSetSensor("humidity")}
+              className={styles.setButton}
+            >
               Set
             </button>
           </div>
 
           {/* Soil Moisture row */}
-          <div className="row-label">
+          <div className={styles.rowLabel}>
             <strong>Soil Moisture:</strong>
           </div>
-          <div className="row-latest">
+          <div className={styles.rowLatest}>
             <input
               type="number"
               value={latestData.soilMoisture}
               readOnly
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">%</span>
+            <span className={styles.unit}>%</span>
           </div>
-          <div className="row-edited">
+          <div className={styles.rowEdited}>
             <input
               type="number"
               value={editedData.soilMoisture}
@@ -444,30 +438,33 @@ const ControlPanel = () => {
                 setEditedData((prev) => ({ ...prev, soilMoisture: e.target.value }))
               }
               onKeyDown={handleKeyDown}
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">%</span>
+            <span className={styles.unit}>%</span>
           </div>
-          <div className="row-set">
-            <button onClick={() => handleSetSensor("soilMoisture")} className="set-button">
+          <div className={styles.rowSet}>
+            <button
+              onClick={() => handleSetSensor("soilMoisture")}
+              className={styles.setButton}
+            >
               Set
             </button>
           </div>
 
           {/* Light row */}
-          <div className="row-label">
+          <div className={styles.rowLabel}>
             <strong>Light:</strong>
           </div>
-          <div className="row-latest">
+          <div className={styles.rowLatest}>
             <input
               type="number"
               value={latestData.light}
               readOnly
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">lux</span>
+            <span className={styles.unit}>lux</span>
           </div>
-          <div className="row-edited">
+          <div className={styles.rowEdited}>
             <input
               type="number"
               value={editedData.light}
@@ -475,30 +472,33 @@ const ControlPanel = () => {
                 setEditedData((prev) => ({ ...prev, light: e.target.value }))
               }
               onKeyDown={handleKeyDown}
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">lux</span>
+            <span className={styles.unit}>lux</span>
           </div>
-          <div className="row-set">
-            <button onClick={() => handleSetSensor("light")} className="set-button">
+          <div className={styles.rowSet}>
+            <button
+              onClick={() => handleSetSensor("light")}
+              className={styles.setButton}
+            >
               Set
             </button>
           </div>
 
           {/* Light State row (boolean) */}
-          <div className="row-label">
+          <div className={styles.rowLabel}>
             <strong>Light State:</strong>
           </div>
-          <div className="row-latest">
+          <div className={styles.rowLatest}>
             <input
               type="text"
               value={latestData.lightState ? "On" : "Off"}
               readOnly
-              className="sensor-input"
+              className={styles.sensorInput}
             />
           </div>
-          <div className="row-edited">
-            <label className="automation-radio-label">
+          <div className={styles.rowEdited}>
+            <label className={styles.automationRadioLabel}>
               <input
                 type="radio"
                 name="lightState"
@@ -510,7 +510,7 @@ const ControlPanel = () => {
               />
               On
             </label>
-            <label className="automation-radio-label">
+            <label className={styles.automationRadioLabel}>
               <input
                 type="radio"
                 name="lightState"
@@ -523,46 +523,49 @@ const ControlPanel = () => {
               Off
             </label>
           </div>
-          <div className="row-set">
-            <button onClick={() => handleSetSensor("lightState")} className="set-button">
+          <div className={styles.rowSet}>
+            <button
+              onClick={() => handleSetSensor("lightState")}
+              className={styles.setButton}
+            >
               Set
             </button>
           </div>
 
           {/* Water Level row */}
-          <div className="row-label">
+          <div className={styles.rowLabel}>
             <strong>Water Level:</strong>
           </div>
-          <div className="row-latest">
+          <div className={styles.rowLatest}>
             <input
               type="number"
               value={latestData.waterLevel}
               readOnly
-              className="sensor-input"
+              className={styles.sensorInput}
             />
-            <span className="unit">%</span>
+            <span className={styles.unit}>%</span>
           </div>
-          <div className="row-edited">
-            <button onClick={handleFillWater} className="set-button">
+          <div className={styles.rowEdited}>
+            <button onClick={handleFillWater} className={styles.setButton}>
               Fill Water
             </button>
           </div>
           <div></div>
 
           {/* Fan row (boolean) */}
-          <div className="row-label">
+          <div className={styles.rowLabel}>
             <strong>Fan:</strong>
           </div>
-          <div className="row-latest">
+          <div className={styles.rowLatest}>
             <input
               type="text"
               value={latestData.fanState ? "On" : "Off"}
               readOnly
-              className="sensor-input"
+              className={styles.sensorInput}
             />
           </div>
-          <div className="row-edited">
-            <label className="automation-radio-label">
+          <div className={styles.rowEdited}>
+            <label className={styles.automationRadioLabel}>
               <input
                 type="radio"
                 name="fanState"
@@ -574,7 +577,7 @@ const ControlPanel = () => {
               />
               On
             </label>
-            <label className="automation-radio-label">
+            <label className={styles.automationRadioLabel}>
               <input
                 type="radio"
                 name="fanState"
@@ -587,8 +590,11 @@ const ControlPanel = () => {
               Off
             </label>
           </div>
-          <div className="row-set">
-            <button onClick={() => handleSetSensor("fanState")} className="set-button">
+          <div className={styles.rowSet}>
+            <button
+              onClick={() => handleSetSensor("fanState")}
+              className={styles.setButton}
+            >
               Set
             </button>
           </div>
@@ -597,8 +603,8 @@ const ControlPanel = () => {
           <div></div>
           <div></div>
           <div></div>
-          <div className="row-set">
-            <button onClick={handleSetAllSensors} className="set-button">
+          <div className={styles.rowSet}>
+            <button onClick={handleSetAllSensors} className={styles.setButton}>
               Set All
             </button>
           </div>
@@ -606,21 +612,24 @@ const ControlPanel = () => {
       </div>
 
       {/* AUTOMATION SECTION */}
-      <div className="automation-container">
+      <div className={styles.automationContainer}>
         <h3>Automations</h3>
-        <p className="automation-purpose">
-          <strong>Purpose of Automation</strong><br />
-          Automations let you perform actions (e.g., turn fan on/off, fill water) automatically based on specific conditions. <br />
+        <p className={styles.automationPurpose}>
+          <strong>Purpose of Automation</strong>
+          <br />
+          Automations let you perform actions (e.g., turn fan on/off, fill water)
+          automatically based on specific conditions.
+          <br />
           Time-based (scheduled) or Threshold-based (react to sensor data).
         </p>
 
         {/* Selection for existing automations */}
-        <div className="automation-top-select">
-          <label className="automation-select-label">Saved Automations:</label>
+        <div className={styles.automationTopSelect}>
+          <label className={styles.automationSelectLabel}>Saved Automations:</label>
           <select
             value={selectedAutomationId}
             onChange={handleSelectAutomation}
-            className="automation-dropdown"
+            className={styles.automationDropdown}
           >
             <option value="">-- Create New --</option>
             {automations.map((auto) => {
@@ -634,32 +643,27 @@ const ControlPanel = () => {
           </select>
         </div>
 
-        {/* -----------------------
-            AUTOMATION GRID 
-            2 ROWS, 4 COLS:
-            Row 1: (Col1: Name, Col2: Type, Col3: DateTime/Threshold, Col4: Action+Buttons)
-            Row 2: (Col1: empty, Col2: Enabled, Col3: Repeat, Col4: empty)
-           ----------------------- */}
-        <div className="automation-grid-4col">
+        {/* 2 rows, 4 cols */}
+        <div className={styles.automationGrid4col}>
           {/* Row 1, Col 1: Name */}
-          <div className="automation-left">
-            <label className="automation-step">Name</label>
+          <div className={styles.automationLeft}>
+            <label className={styles.automationStep}>Name</label>
             <input
               type="text"
-              className="automation-name-input"
+              className={styles.automationNameInput}
               value={automationForm.name}
               onChange={(e) => handleAutomationFormChange("name", e.target.value)}
             />
           </div>
 
           {/* Row 1, Col 2: Type */}
-          <div className="automation-middle">
-            <label className="automation-step">Type</label>
-            <div className="automation-select-block">
+          <div className={styles.automationMiddle}>
+            <label className={styles.automationStep}>Type</label>
+            <div className={styles.automationSelectBlock}>
               <select
                 value={automationForm.type}
                 onChange={(e) => handleAutomationFormChange("type", e.target.value)}
-                className="automation-dropdown"
+                className={styles.automationDropdown}
               >
                 <option value="time-based">Time-Based</option>
                 <option value="threshold-based">Threshold-Based</option>
@@ -667,23 +671,25 @@ const ControlPanel = () => {
             </div>
           </div>
 
-          {/* Row 1, Col 3: If time-based => DateTime; If threshold-based => threshold fields */}
-          <div className="automation-right">
+          {/* Row 1, Col 3: If time-based => DateTime; if threshold-based => threshold */}
+          <div className={styles.automationRight}>
             {automationForm.type === "time-based" ? (
               <>
-                <label className="automation-label-margin">Date/Time</label>
+                <label className={styles.automationLabelMargin}>Date/Time</label>
                 <input
                   type="datetime-local"
-                  className="automation-datetime-input"
+                  className={styles.automationDatetimeInput}
                   value={automationForm.dateTime}
-                  onChange={(e) => handleAutomationFormChange("dateTime", e.target.value)}
+                  onChange={(e) =>
+                    handleAutomationFormChange("dateTime", e.target.value)
+                  }
                 />
               </>
             ) : (
               <>
-                <label className="automation-label-margin">Sensor Field</label>
+                <label className={styles.automationLabelMargin}>Sensor Field</label>
                 <select
-                  className="automation-dropdown automation-select-margin"
+                  className={`${styles.automationDropdown} ${styles.automationSelectMargin}`}
                   value={automationForm.sensorField}
                   onChange={(e) =>
                     handleAutomationFormChange("sensorField", e.target.value)
@@ -696,35 +702,35 @@ const ControlPanel = () => {
                   <option value="waterLevel">Water Level</option>
                 </select>
 
-                <label className="automation-label-margin">Operator</label>
+                <label className={styles.automationLabelMargin}>Operator</label>
                 <select
-                  className="automation-dropdown automation-select-margin"
+                  className={`${styles.automationDropdown} ${styles.automationSelectMargin}`}
                   value={automationForm.operator}
-                  onChange={(e) =>
-                    handleAutomationFormChange("operator", e.target.value)
-                  }
+                  onChange={(e) => handleAutomationFormChange("operator", e.target.value)}
                 >
                   <option value=">">&gt;</option>
                   <option value="<">&lt;</option>
                   <option value="=">=</option>
                 </select>
 
-                <label className="automation-label-margin">Threshold</label>
+                <label className={styles.automationLabelMargin}>Threshold</label>
                 <input
                   type="number"
-                  className="automation-name-input automation-select-margin"
+                  className={`${styles.automationNameInput} ${styles.automationSelectMargin}`}
                   value={automationForm.thresholdValue}
-                  onChange={(e) => handleAutomationFormChange("thresholdValue", e.target.value)}
+                  onChange={(e) =>
+                    handleAutomationFormChange("thresholdValue", e.target.value)
+                  }
                 />
               </>
             )}
           </div>
 
           {/* Row 1, Col 4: Action + Buttons */}
-          <div className="automation-saved">
+          <div className={styles.automationSaved}>
             <label>Action</label>
             <select
-              className="automation-dropdown"
+              className={styles.automationDropdown}
               value={automationForm.action}
               onChange={(e) => handleAutomationFormChange("action", e.target.value)}
             >
@@ -734,24 +740,24 @@ const ControlPanel = () => {
               <option value="sendAlert">Send Alert</option>
             </select>
 
-            <div className="automation-action-buttons-container">
+            <div className={styles.automationActionButtonsContainer}>
               <button
                 onClick={handleCreateAutomation}
-                className="set-button automation-space-right"
+                className={`${styles.setButton} ${styles.automationSpaceRight}`}
               >
                 Create
               </button>
               <button
                 onClick={handleUpdateAutomation}
                 disabled={!selectedAutomationId}
-                className="set-button automation-space-right"
+                className={`${styles.setButton} ${styles.automationSpaceRight}`}
               >
                 Update
               </button>
               <button
                 onClick={handleDeleteSelected}
                 disabled={!selectedAutomationId}
-                className="set-button"
+                className={styles.setButton}
               >
                 Delete
               </button>
@@ -759,11 +765,11 @@ const ControlPanel = () => {
           </div>
 
           {/* 2nd row, Col 1: empty */}
-          <div className="automation-left-empty"></div>
+          <div className={styles.automationLeftEmpty}></div>
 
           {/* 2nd row, Col 2: Enabled */}
-          <div className="automation-middle-enabled">
-            <label className="automation-enabled-label">Enabled?</label>
+          <div className={styles.automationMiddleEnabled}>
+            <label className={styles.automationEnabledLabel}>Enabled?</label>
             <input
               type="checkbox"
               checked={automationForm.enabled}
@@ -772,12 +778,12 @@ const ControlPanel = () => {
           </div>
 
           {/* 2nd row, Col 3: Repeat (only if time-based) */}
-          <div className="automation-right-repeat">
+          <div className={styles.automationRightRepeat}>
             {automationForm.type === "time-based" && (
               <>
-                <label className="automation-repeat-label">Repeat</label>
+                <label className={styles.automationRepeatLabel}>Repeat</label>
                 <select
-                  className="automation-dropdown-time"
+                  className={styles.automationDropdownTime}
                   value={automationForm.repeatSchedule}
                   onChange={(e) =>
                     handleAutomationFormChange("repeatSchedule", e.target.value)
@@ -792,15 +798,15 @@ const ControlPanel = () => {
           </div>
 
           {/* 2nd row, Col 4: empty */}
-          <div className="automation-saved-empty"></div>
+          <div className={styles.automationSavedEmpty}></div>
         </div>
 
         {/* List of automations with quick toggle */}
-        <div className="automation-existing-list">
+        <div className={styles.automationExistingList}>
           <h4>Existing Automations</h4>
           {automations.length === 0 && <p>No automations found.</p>}
           {automations.map((auto) => (
-            <div key={auto.id} className="automation-item-row">
+            <div key={auto.id} className={styles.automationItemRow}>
               <div>
                 <strong>{auto.name}</strong> ({auto.type}) –{" "}
                 {auto.enabled ? "Enabled" : "Disabled"}
@@ -808,7 +814,7 @@ const ControlPanel = () => {
               <div>
                 <button
                   onClick={() => handleToggleEnabled(auto.id, auto.enabled)}
-                  className="set-button automation-toggle-button"
+                  className={`${styles.setButton} ${styles.automationToggleButton}`}
                 >
                   Toggle
                 </button>
@@ -820,7 +826,7 @@ const ControlPanel = () => {
         {/* Clear all automations button */}
         <button
           onClick={handleClearAutomations}
-          className="set-button automation-clear-button"
+          className={`${styles.setButton} ${styles.automationClearButton}`}
         >
           Clear All Automations
         </button>
