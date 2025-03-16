@@ -163,9 +163,18 @@
     display: flex;
     justify-content: center;
     gap: 10px;
+    margin-left: 220px;
   }
   
-  .logsButton,
+  .logsButton {
+    padding: 5px 10px;
+    border: 1px solid #8ecae6;
+    border-radius: 4px;
+    background-color: #2d2d44;
+    color: #ffffff;
+    cursor: pointer;
+  }
+
   .clearLogsButton {
     padding: 5px 10px;
     border: 1px solid #8ecae6;
@@ -173,5 +182,6 @@
     background-color: #2d2d44;
     color: #ffffff;
     cursor: pointer;
+    margin-right: 120px;
   }
   

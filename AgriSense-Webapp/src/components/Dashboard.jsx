@@ -220,95 +220,120 @@ function Dashboard() {
             <h3>Latest Sensor Data</h3>
 
             <div className={styles.sensorRow}>
-              <label>
-                <strong>Temperature:</strong>
-              </label>
-              <input
-                type="number"
-                value={latestData.temperature}
-                readOnly
-                className={styles.sensorInput}
-              />
-              °C
-            </div>
-
-            <div className={styles.sensorRow}>
-              <label>
-                <strong>Humidity:</strong>
-              </label>
-              <input
-                type="number"
-                value={latestData.humidity}
-                readOnly
-                className={styles.sensorInput}
-              />
-              %
-            </div>
-
-            <div className={styles.sensorRow}>
-              <label>
-                <strong>Soil Moisture:</strong>
-              </label>
-              <input
-                type="number"
-                value={latestData.soilMoisture}
-                readOnly
-                className={styles.sensorInput}
-              />
-              %
-            </div>
-
-            <div className={styles.sensorRow}>
-              <label>
-                <strong>Water Level:</strong>
-              </label>
-              <input
-                type="number"
-                value={latestData.waterLevel}
-                readOnly
-                className={styles.sensorInput}
-              />
-              %
-            </div>
-
-            <div className={styles.sensorRow}>
-              <label>
-                <strong>Light:</strong>
-              </label>
-              <input
-                type="number"
-                value={latestData.light}
-                readOnly
-                className={styles.sensorInput}
-              />
-              lux
-            </div>
-
-            <div className={styles.sensorRow}>
-              <label>
-                <strong>Light State:</strong>
-              </label>
-              <div className={styles.radioGroup}>
+              <div className={styles.sensorLabel}>
                 <label>
-                  <input
-                    type="radio"
-                    name="lightState"
-                    value="true"
-                    checked={latestData.lightState === true}
-                    onChange={handleLightStateChange}
-                  />
-                  On
+                  <strong>Temperature:</strong>
                 </label>
+              </div>
+              <div className={styles.sensorInputContainer}>
+                <input
+                  type="number"
+                  value={latestData.temperature}
+                  readOnly
+                  className={styles.sensorInput}
+                />
+                <span>°C</span>
+              </div>
+            </div>
+
+            <div className={styles.sensorRow}>
+              <div className={styles.sensorLabel}>
                 <label>
-                  <input
-                    type="radio"
-                    name="lightState"
-                    value="false"
-                    checked={latestData.lightState === false}
-                    onChange={handleLightStateChange}
-                  />
-                  Off
+                  <strong>Humidity:</strong>
                 </label>
+              </div>
+              <div className={styles.sensorInputContainer}>
+                <input
+                  type="number"
+                  value={latestData.humidity}
+                  readOnly
+                  className={styles.sensorInput}
+                />
+                <span>%</span>
+              </div>
+            </div>
+
+            <div className={styles.sensorRow}>
+              <div className={styles.sensorLabel}>
+                <label>
+                  <strong>Soil Moisture:</strong>
+                </label>
+              </div>
+              <div className={styles.sensorInputContainer}>
+                <input
+                  type="number"
+                  value={latestData.soilMoisture}
+                  readOnly
+                  className={styles.sensorInput}
+                />
+                <span>%</span>
+              </div>
+            </div>
+
+            <div className={styles.sensorRow}>
+              <div className={styles.sensorLabel}>
+                <label>
+                  <strong>Water Level:</strong>
+                </label>
+              </div>
+              <div className={styles.sensorInputContainer}>
+                <input
+                  type="number"
+                  value={latestData.waterLevel}
+                  readOnly
+                  className={styles.sensorInput}
+                />
+                <span>%</span>
+              </div>
+            </div>
+
+            <div className={styles.sensorRow}>
+              <div className={styles.sensorLabel}>
+                <label>
+                  <strong>Light:</strong>
+                </label>
+              </div>
+              <div className={styles.sensorInputContainer}>
+                <input
+                  type="number"
+                  value={latestData.light}
+                  readOnly
+                  className={styles.sensorInput}
+                />
+                <span>lux</span>
+              </div>
+            </div>
+
+            {/* Light State row with the radio group included in the second column */}
+            <div className={styles.sensorRow}>
+              <div className={styles.sensorLabel}>
+                <label>
+                  <strong>Light State:</strong>
+                </label>
+              </div>
+              <div className={styles.sensorInputContainer}>
+                <div className={styles.radioGroup}>
+                  <label>
+                    <input
+                      type="radio"
+                      name="lightState"
+                      value="true"
+                      checked={latestData.lightState === true}
+                      onChange={handleLightStateChange}
+                    />
+                    On
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="lightState"
+                      value="false"
+                      checked={latestData.lightState === false}
+                      onChange={handleLightStateChange}
+                    />
+                    Off
+                  </label>
+                </div>
               </div>
             </div>
           </div>

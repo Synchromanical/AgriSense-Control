@@ -18,7 +18,7 @@
     margin: 2rem auto;
     background-color: #2d2d44;
     border-radius: 8px;
-    height: 650px;
+    height: 500px;
     padding: 25px;
     margin-top: 22px;
     text-align: center;
@@ -132,7 +132,7 @@
     align-items: center;
     gap: 10px;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 3px;
   }
   
   .automationRightRepeat {
@@ -158,7 +158,7 @@
   }
   
   .automationSelectBlock {
-    margin-top: 1px;
+    margin-top: -8px;
   }
   
   .automationNameInput {
@@ -168,7 +168,7 @@
     background-color: #1e1e2f;
     color: #ffffff;
     margin-left: 10px;
-    margin-top: 21px;
+    margin-top: 19px;
     width: 150px;
   }
   
@@ -184,7 +184,7 @@
     background-color: #1e1e2f;
     color: #ffffff;
     margin-right: 5px;
-    margin-top: 18px;
+    margin-top: 27px;
   }
   
   .automationDropdownTime {
@@ -193,7 +193,7 @@
     border: 1px solid #8ecae6;
     background-color: #1e1e2f;
     color: #ffffff;
-    margin-bottom: 20px;
+    margin-bottom: 0px;
   }
   
   .automationSelectMargin {
@@ -201,7 +201,7 @@
   }
   
   .automationActionButtonsContainer {
-    margin-top: 1rem;
+    margin-top: 2rem;
   }
   
   .automationSpaceRight {
@@ -210,7 +210,7 @@
   
   /* text field for date/time */
   .automationDatetimeInput {
-    margin-top: 18px;
+    margin-top: 26px;
     margin-left: 5px;
     padding: 5px;
     border-radius: 4px;
