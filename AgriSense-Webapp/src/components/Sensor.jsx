@@ -1,41 +1,44 @@
-// src/components/Sensor.jsx
-import React, { useState } from "react";
-// Optionally import from ControlPanel.module.css if you want the same classes
-// or replicate them in Sensor.module.css
+import React, { useState, useContext, useEffect } from "react";
+import { SensorContext } from "../SensorContext";
 import styles from "../Sensor.module.css"; 
 
 const Sensor = () => {
+  const { activeSensors, addSensor, removeSensor, clearSensors } = useContext(SensorContext);
   const [selectedSensor, setSelectedSensor] = useState("");
   const [selectedNode, setSelectedNode] = useState("1");
-  const [activeSensors, setActiveSensors] = useState([]);
 
-  // Save a new sensor instance
+  // Load the last selected sensor from localStorage if available.
+  useEffect(() => {
+    const savedSensor = localStorage.getItem("selectedSensor");
+    if (savedSensor) {
+      setSelectedSensor(savedSensor);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("selectedSensor", selectedSensor);
+  }, [selectedSensor]);
+
   const handleSaveInstance = () => {
     if (!selectedSensor) return;
-    const newEntry = {
-      id: Date.now().toString(),
-      sensor: selectedSensor,
-      node: selectedNode,
-    };
-    setActiveSensors((prev) => [...prev, newEntry]);
+    addSensor(selectedSensor);
   };
 
-  // Delete a single sensor by id
-  const handleDeleteSingle = (idToDelete) => {
-    setActiveSensors((prev) => prev.filter((item) => item.id !== idToDelete));
+  const handleDeleteSingle = (sensor) => {
+    removeSensor(sensor);
   };
 
-  // Clear all sensors
   const handleClearAll = () => {
-    setActiveSensors([]);
+    clearSensors();
   };
 
   return (
     <div className={styles.sensorContent}>
+      <h2>Sensor Manager</h2>
       <div className={styles.sensorGrid}>
         <h3 className={styles.instanceConfigTitle}>Instance Configuration</h3>
 
-        {/* Sensor + dropdown */}
+        {/* Sensor selection */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Sensor:</label>
@@ -50,13 +53,13 @@ const Sensor = () => {
               <option value="Temperature">Temperature</option>
               <option value="Humidity">Humidity</option>
               <option value="Soil Moisture">Soil Moisture</option>
-              <option value="Capacitive (Water)">Capacitive (Water)</option>
+              <option value="Water Level">Water Level</option>
               <option value="Light">Light</option>
             </select>
           </div>
         </div>
 
-        {/* Node + radio buttons */}
+        {/* Node selection */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Node:</label>
@@ -85,24 +88,24 @@ const Sensor = () => {
           </div>
         </div>
 
-        {/* Save Instance button */}
+        {/* Save button */}
         <div className={styles.buttonRow}>
           <button className={styles.saveButton} onClick={handleSaveInstance}>
             Save Instance
           </button>
         </div>
 
-        {/* Active sensors list (similar to "Existing Automations") */}
+        {/* Active Sensors list */}
         <h4 className={styles.automationHeading}>Active Sensors</h4>
         {activeSensors.length === 0 && <p>No active sensors yet.</p>}
-        {activeSensors.map((item) => (
-          <div key={item.id} className={styles.automationItemRow}>
+        {activeSensors.map((sensor, index) => (
+          <div key={index} className={styles.automationItemRow}>
             <div>
-              <strong>{item.sensor}</strong> (Node {item.node})
+              <strong>{sensor}</strong> (Node {selectedNode})
             </div>
             <div>
               <button
-                onClick={() => handleDeleteSingle(item.id)}
+                onClick={() => handleDeleteSingle(sensor)}
                 className={`${styles.setButton} ${styles.automationToggleButton}`}
               >
                 Delete
@@ -110,13 +113,8 @@ const Sensor = () => {
             </div>
           </div>
         ))}
-
-        {/* Clear All Sensors button */}
         {activeSensors.length > 0 && (
-          <button
-            onClick={handleClearAll}
-            className={`${styles.setButton} ${styles.automationClearButton}`}
-          >
+          <button onClick={handleClearAll} className={`${styles.setButton} ${styles.automationClearButton}`}>
             Clear All Sensors
           </button>
         )}

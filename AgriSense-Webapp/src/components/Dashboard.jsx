@@ -1,31 +1,21 @@
-// src/components/Dashboard.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { collection, query, orderBy, onSnapshot, addDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import styles from "../Dashboard.module.css";
+import { SensorContext } from "../SensorContext";
 
-/** Utility to format numeric values to 1 decimal place */
 function formatOneDecimal(value) {
   const num = parseFloat(value);
   if (isNaN(num)) return "";
   return num.toFixed(1);
 }
 
-/**
- * Helper to produce a string timestamp (no fractional seconds),
- * e.g. "2025-02-02T12:30:00Z"
- */
 function getTimestampString(date = new Date()) {
   const iso = date.toISOString();
   const [withoutMillis] = iso.split(".");
   return withoutMillis + "Z";
 }
 
-/**
- * Example function that calculates "next occurrence" 
- * for a time-based automation if you want that logic,
- * or you can omit this if you already have it.
- */
 function computeNextOccurrence(automation) {
   if (automation.type !== "time-based" || !automation.enabled) return null;
   if (!automation.dateTime) return null;
@@ -71,12 +61,11 @@ function Dashboard() {
     fanState: false,
     timestamp: null,
   });
-
-  const [dashboardLogs, setDashboardLogs] = useState([]);
-  // If you’re displaying upcoming automations, store them here
+  // Store full logs array from Firestore
+  const [rawDashboardLogs, setRawDashboardLogs] = useState([]);
   const [upcomingAutomations, setUpcomingAutomations] = useState([]);
+  const { activeSensors } = useContext(SensorContext);
 
-  // 1) Real-time sensorData
   useEffect(() => {
     const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -96,11 +85,11 @@ function Dashboard() {
           fanState: false,
           timestamp: null,
         });
-        setDashboardLogs([]);
+        setRawDashboardLogs([]);
         return;
       }
 
-      // The last doc is the newest
+      // Latest sensor data is taken from the last document
       const newestDoc = docs[docs.length - 1];
       setLatestData({
         temperature: formatOneDecimal(newestDoc.temperature),
@@ -113,7 +102,7 @@ function Dashboard() {
         timestamp: newestDoc.timestamp,
       });
 
-      // Build array of lines for logs
+      // Build an array of log lines for each sensor field
       const lines = [];
       docs.forEach((docData) => {
         let timeObj = new Date(0);
@@ -124,7 +113,6 @@ function Dashboard() {
           }
         }
         const timeDisplay = timeObj.toLocaleString();
-
         const sensorFields = [
           { label: "Temperature", value: docData.temperature },
           { label: "Humidity", value: docData.humidity },
@@ -134,7 +122,6 @@ function Dashboard() {
           { label: "Light State", value: docData.lightState },
           { label: "Fan State", value: docData.fanState },
         ];
-
         sensorFields.forEach((field) => {
           if (field.value !== undefined && field.value !== null) {
             lines.push({
@@ -145,43 +132,18 @@ function Dashboard() {
           }
         });
       });
-
-      // lines[] is ascending. Give each line an ID
+      // Give each line an ID
       lines.forEach((line, idx) => {
         line.id = idx + 1;
       });
-
-      // Last 5 lines, reversed
-      const last5 = lines.slice(-5).reverse();
-      setDashboardLogs(last5);
+      // Store the full logs array instead of slicing immediately
+      setRawDashboardLogs(lines);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Simple Light On/Off example
-  const handleLightStateChange = async (e) => {
-    const val = e.target.value === "true";
-    const newDoc = {
-      temperature: parseFloat(latestData.temperature) || 0,
-      humidity: parseFloat(latestData.humidity) || 0,
-      soilMoisture: parseFloat(latestData.soilMoisture) || 0,
-      light: parseFloat(latestData.light) || 0,
-      waterLevel: parseFloat(latestData.waterLevel) || 0,
-      lightState: val,
-      fanState: latestData.fanState,
-      timestamp: getTimestampString(),
-    };
-    try {
-      await addDoc(collection(db, "sensorData"), newDoc);
-    } catch (error) {
-      console.error("Error changing lightState:", error);
-    }
-  };
-
-  // 2) Optional: subscribe to automations & compute next occurrences
   useEffect(() => {
-    // If you want to show upcoming automations on the dashboard
     import("firebase/firestore")
       .then(({ onSnapshot }) => {
         const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
@@ -208,170 +170,127 @@ function Dashboard() {
       .catch((err) => console.error(err));
   }, []);
 
+  // Filter logs to include only those related to an active sensor.
+  // Then, display only the last five of these filtered logs.
+  const filteredDashboardLogs = activeSensors.length
+    ? rawDashboardLogs.filter((log) =>
+        activeSensors.some((sensor) =>
+          log.action.toLowerCase().includes(sensor.toLowerCase())
+        )
+      )
+    : [];
+
+  const displayedDashboardLogs = filteredDashboardLogs.slice(-5).reverse();
+
   return (
     <div className={styles.content}>
       <h2>Dashboard</h2>
-
-      {/* Left/Right: sensor data + logs */}
       <div className={styles.dashboardContainer}>
-        {/* LEFT: LATEST SENSOR DATA */}
         <div className={styles.sensorDataContainer}>
           <div className={styles.sensorData}>
             <h3>Latest Sensor Data</h3>
-
-            <div className={styles.sensorRow}>
-              <div className={styles.sensorLabel}>
-                <label>
-                  <strong>Temperature:</strong>
-                </label>
-              </div>
-              <div className={styles.sensorInputContainer}>
-                <input
-                  type="number"
-                  value={latestData.temperature}
-                  readOnly
-                  className={styles.sensorInput}
-                />
-                <span>°C</span>
-              </div>
-            </div>
-
-            <div className={styles.sensorRow}>
-              <div className={styles.sensorLabel}>
-                <label>
-                  <strong>Humidity:</strong>
-                </label>
-              </div>
-              <div className={styles.sensorInputContainer}>
-                <input
-                  type="number"
-                  value={latestData.humidity}
-                  readOnly
-                  className={styles.sensorInput}
-                />
-                <span>%</span>
-              </div>
-            </div>
-
-            <div className={styles.sensorRow}>
-              <div className={styles.sensorLabel}>
-                <label>
-                  <strong>Soil Moisture:</strong>
-                </label>
-              </div>
-              <div className={styles.sensorInputContainer}>
-                <input
-                  type="number"
-                  value={latestData.soilMoisture}
-                  readOnly
-                  className={styles.sensorInput}
-                />
-                <span>%</span>
-              </div>
-            </div>
-
-            <div className={styles.sensorRow}>
-              <div className={styles.sensorLabel}>
-                <label>
-                  <strong>Water Level:</strong>
-                </label>
-              </div>
-              <div className={styles.sensorInputContainer}>
-                <input
-                  type="number"
-                  value={latestData.waterLevel}
-                  readOnly
-                  className={styles.sensorInput}
-                />
-                <span>%</span>
-              </div>
-            </div>
-
-            <div className={styles.sensorRow}>
-              <div className={styles.sensorLabel}>
-                <label>
-                  <strong>Light:</strong>
-                </label>
-              </div>
-              <div className={styles.sensorInputContainer}>
-                <input
-                  type="number"
-                  value={latestData.light}
-                  readOnly
-                  className={styles.sensorInput}
-                />
-                <span>lux</span>
-              </div>
-            </div>
-
-            {/* Light State row with the radio group included in the second column */}
-            <div className={styles.sensorRow}>
-              <div className={styles.sensorLabel}>
-                <label>
-                  <strong>Light State:</strong>
-                </label>
-              </div>
-              <div className={styles.sensorInputContainer}>
-                <div className={styles.radioGroup}>
-                  <label>
-                    <input
-                      type="radio"
-                      name="lightState"
-                      value="true"
-                      checked={latestData.lightState === true}
-                      onChange={handleLightStateChange}
-                    />
-                    On
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="lightState"
-                      value="false"
-                      checked={latestData.lightState === false}
-                      onChange={handleLightStateChange}
-                    />
-                    Off
-                  </label>
+            {activeSensors.includes("Temperature") && (
+              <div className={styles.sensorRow}>
+                <div className={styles.sensorLabel}>
+                  <label><strong>Temperature:</strong></label>
+                </div>
+                <div className={styles.sensorInputContainer}>
+                  <input type="number" value={latestData.temperature} readOnly className={styles.sensorInput} />
+                  <span>°C</span>
                 </div>
               </div>
-            </div>
+            )}
+            {activeSensors.includes("Humidity") && (
+              <div className={styles.sensorRow}>
+                <div className={styles.sensorLabel}>
+                  <label><strong>Humidity:</strong></label>
+                </div>
+                <div className={styles.sensorInputContainer}>
+                  <input type="number" value={latestData.humidity} readOnly className={styles.sensorInput} />
+                  <span>%</span>
+                </div>
+              </div>
+            )}
+            {activeSensors.includes("Soil Moisture") && (
+              <div className={styles.sensorRow}>
+                <div className={styles.sensorLabel}>
+                  <label><strong>Soil Moisture:</strong></label>
+                </div>
+                <div className={styles.sensorInputContainer}>
+                  <input type="number" value={latestData.soilMoisture} readOnly className={styles.sensorInput} />
+                  <span>%</span>
+                </div>
+              </div>
+            )}
+            {activeSensors.includes("Water Level") && (
+              <div className={styles.sensorRow}>
+                <div className={styles.sensorLabel}>
+                  <label><strong>Water Level:</strong></label>
+                </div>
+                <div className={styles.sensorInputContainer}>
+                  <input type="number" value={latestData.waterLevel} readOnly className={styles.sensorInput} />
+                  <span>%</span>
+                </div>
+              </div>
+            )}
+            {activeSensors.includes("Light") && (
+              <>
+                <div className={styles.sensorRow}>
+                  <div className={styles.sensorLabel}>
+                    <label><strong>Light:</strong></label>
+                  </div>
+                  <div className={styles.sensorInputContainer}>
+                    <input type="number" value={latestData.light} readOnly className={styles.sensorInput} />
+                    <span>lux</span>
+                  </div>
+                </div>
+                <div className={styles.sensorRow}>
+                  <div className={styles.sensorLabel}>
+                    <label><strong>Light State:</strong></label>
+                  </div>
+                  <div className={styles.sensorInputContainer}>
+                    <div className={styles.radioGroup}>
+                      <label>
+                        <input type="radio" name="lightState" value="true" checked={latestData.lightState === true} onChange={() => {}} />
+                        On
+                      </label>
+                      <label>
+                        <input type="radio" name="lightState" value="false" checked={latestData.lightState === false} onChange={() => {}} />
+                        Off
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
-
-        {/* RIGHT: Last 5 logs */}
         <div className={styles.dashboardLogsContainer}>
           <h3>Latest Logs</h3>
-          <table className={styles.logsTable}>
-            <thead>
-              <tr>
-                <th className={styles.logsTh}>ID</th>
-                <th className={styles.logsTh}>Time</th>
-                <th className={styles.logsTh}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboardLogs.length > 0 ? (
-                dashboardLogs.map((log) => (
+          {displayedDashboardLogs.length > 0 ? (
+            <table className={styles.logsTable}>
+              <thead>
+                <tr>
+                  <th className={styles.logsTh}>ID</th>
+                  <th className={styles.logsTh}>Time</th>
+                  <th className={styles.logsTh}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedDashboardLogs.map((log) => (
                   <tr key={log.id}>
                     <td className={styles.logsTd}>{log.id}</td>
                     <td className={styles.logsTd}>{log.timeDisplay}</td>
                     <td className={styles.logsTd}>{log.action}</td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className={styles.logsTd} colSpan="3">
-                    No logs available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>No logs available</p>
+          )}
         </div>
       </div>
-
-      {/* NEW SECTION: Upcoming Automations */}
       <div className={styles.dashboardAutomationsContainer}>
         <h3>Upcoming Automations</h3>
         {upcomingAutomations.length === 0 ? (
@@ -388,9 +307,7 @@ function Dashboard() {
             </thead>
             <tbody>
               {upcomingAutomations.map((auto) => {
-                const next = auto.nextOccurrence
-                  ? auto.nextOccurrence.toLocaleString()
-                  : "N/A";
+                const next = auto.nextOccurrence ? auto.nextOccurrence.toLocaleString() : "N/A";
                 return (
                   <tr key={auto.id}>
                     <td>{auto.name}</td>

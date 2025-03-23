@@ -1,14 +1,15 @@
-// src/components/Graph.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
-
 import styles from "../Graph.module.css";
+import { SensorContext } from "../SensorContext";
 
 const Graph = () => {
+  const { activeSensors } = useContext(SensorContext);
   const [sensorData, setSensorData] = useState([]);
+  // Default selection is "all" to show all active sensors.
   const [selectedField, setSelectedField] = useState("all");
 
   useEffect(() => {
@@ -22,20 +23,21 @@ const Graph = () => {
           humidity: data.humidity,
           soilMoisture: data.soilMoisture,
           light: data.light,
+          waterLevel: data.waterLevel,
         };
       });
       setSensorData(docs);
     });
-
     return () => unsub();
   }, []);
 
-  // Build arrays
+  // Build arrays for each sensor field
   const timestamps = [];
   const humidityData = [];
   const temperatureData = [];
   const lightData = [];
   const soilMoistureData = [];
+  const waterLevelData = [];
 
   sensorData.forEach((entry) => {
     let ts = entry.timestamp;
@@ -44,7 +46,6 @@ const Graph = () => {
     } else {
       ts = new Date(0);
     }
-
     const label =
       ts.toLocaleDateString("en-US", {
         year: "numeric",
@@ -56,81 +57,105 @@ const Graph = () => {
         hour: "2-digit",
         minute: "2-digit",
       });
-
     timestamps.push(label);
     humidityData.push(entry.humidity);
     temperatureData.push(entry.temperature);
-    soilMoistureData.push(entry.soilMoisture);
     lightData.push(entry.light);
+    soilMoistureData.push(entry.soilMoisture);
+    waterLevelData.push(entry.waterLevel);
   });
 
-  // Define colors
+  // Define colors for each dataset
   const fieldColors = {
     humidity: "rgba(54, 162, 235, 1)",
     temperature: "rgba(255, 99, 132, 1)",
     light: "rgba(255, 206, 86, 1)",
     soilMoisture: "rgba(75, 192, 192, 1)",
+    waterLevel: "rgba(153, 102, 255, 1)",
   };
 
-  // Build chartData
   let chartData;
   if (selectedField === "all") {
-    chartData = {
-      labels: timestamps,
-      datasets: [
-        {
-          label: "Humidity (%)",
-          data: humidityData,
-          borderColor: fieldColors.humidity,
+    const datasets = [];
+    activeSensors.forEach((sensor) => {
+      let labelName = "";
+      let dataArr = [];
+      let color = "";
+      switch (sensor) {
+        case "Temperature":
+          labelName = "Temperature (°C)";
+          dataArr = temperatureData;
+          color = fieldColors.temperature;
+          break;
+        case "Humidity":
+          labelName = "Humidity (%)";
+          dataArr = humidityData;
+          color = fieldColors.humidity;
+          break;
+        case "Soil Moisture":
+          labelName = "Soil Moisture (%)";
+          dataArr = soilMoistureData;
+          color = fieldColors.soilMoisture;
+          break;
+        case "Light":
+          labelName = "Light (lux)";
+          dataArr = lightData;
+          color = fieldColors.light;
+          break;
+        case "Water Level":
+          labelName = "Water Level (%)";
+          dataArr = waterLevelData;
+          color = fieldColors.waterLevel;
+          break;
+        default:
+          break;
+      }
+      if (dataArr.length) {
+        datasets.push({
+          label: labelName,
+          data: dataArr,
+          borderColor: color,
           borderWidth: 2,
           fill: false,
-        },
-        {
-          label: "Temperature (°C)",
-          data: temperatureData,
-          borderColor: fieldColors.temperature,
-          borderWidth: 2,
-          fill: false,
-        },
-        {
-          label: "Light (lux)",
-          data: lightData,
-          borderColor: fieldColors.light,
-          borderWidth: 2,
-          fill: false,
-        },
-        {
-          label: "Soil Moisture (%)",
-          data: soilMoistureData,
-          borderColor: fieldColors.soilMoisture,
-          borderWidth: 2,
-          fill: false,
-        },
-      ],
-    };
+        });
+      }
+    });
+    chartData = { labels: timestamps, datasets };
   } else {
+    // When a specific sensor is selected
+    let sensorName = selectedField; // e.g. "Temperature"
     let labelName = "";
     let dataArr = [];
-    let color = fieldColors.humidity;
-
-    if (selectedField === "humidity") {
-      labelName = "Humidity (%)";
-      dataArr = humidityData;
-      color = fieldColors.humidity;
-    } else if (selectedField === "temperature") {
-      labelName = "Temperature (°C)";
-      dataArr = temperatureData;
-      color = fieldColors.temperature;
-    } else if (selectedField === "light") {
-      labelName = "Light (lux)";
-      dataArr = lightData;
-      color = fieldColors.light;
-    } else {
-      labelName = "Soil Moisture (%)";
-      dataArr = soilMoistureData;
-      color = fieldColors.soilMoisture;
+    let color = "";
+    switch (sensorName) {
+      case "Temperature":
+        labelName = "Temperature (°C)";
+        dataArr = temperatureData;
+        color = fieldColors.temperature;
+        break;
+      case "Humidity":
+        labelName = "Humidity (%)";
+        dataArr = humidityData;
+        color = fieldColors.humidity;
+        break;
+      case "Soil Moisture":
+        labelName = "Soil Moisture (%)";
+        dataArr = soilMoistureData;
+        color = fieldColors.soilMoisture;
+        break;
+      case "Light":
+        labelName = "Light (lux)";
+        dataArr = lightData;
+        color = fieldColors.light;
+        break;
+      case "Water Level":
+        labelName = "Water Level (%)";
+        dataArr = waterLevelData;
+        color = fieldColors.waterLevel;
+        break;
+      default:
+        break;
     }
-
     chartData = {
       labels: timestamps,
       datasets: [
@@ -183,24 +208,27 @@ const Graph = () => {
   return (
     <div className={styles.content}>
       <h2>Sensor Data Over Time</h2>
-
-      <div className={styles.graphPanel}>
-        <label>Select Data Type: </label>
-        <select
-          value={selectedField}
-          onChange={(e) => setSelectedField(e.target.value)}
-        >
-          <option value="all">Show All</option>
-          <option value="humidity">Humidity (%)</option>
-          <option value="temperature">Temperature (°C)</option>
-          <option value="light">Light (lux)</option>
-          <option value="soilMoisture">Soil Moisture (%)</option>
-        </select>
-
-        <div className={styles.graphContainer}>
-          <Line data={chartData} options={chartOptions} />
+      {activeSensors.length === 0 ? (
+        <p>Please select a sensor in the Sensor tab to view graphs.</p>
+      ) : (
+        <div className={styles.graphPanel}>
+          <label>Select Data Type: </label>
+          <select
+            value={selectedField}
+            onChange={(e) => setSelectedField(e.target.value)}
+          >
+            <option value="all">Show All</option>
+            {activeSensors.map((sensor) => (
+              <option key={sensor} value={sensor}>
+                {sensor}
+              </option>
+            ))}
+          </select>
+          <div className={styles.graphContainer}>
+            <Line data={chartData} options={chartOptions} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
