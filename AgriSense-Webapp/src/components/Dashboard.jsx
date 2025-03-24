@@ -61,10 +61,10 @@ function Dashboard() {
     fanState: false,
     timestamp: null,
   });
-  // Store full logs array from Firestore
   const [rawDashboardLogs, setRawDashboardLogs] = useState([]);
   const [upcomingAutomations, setUpcomingAutomations] = useState([]);
-  const { activeSensors } = useContext(SensorContext);
+  const { activeSensors, selectedInstance } = useContext(SensorContext);
+  const sensors = activeSensors[selectedInstance] || [];
 
   useEffect(() => {
     const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
@@ -89,7 +89,6 @@ function Dashboard() {
         return;
       }
 
-      // Latest sensor data is taken from the last document
       const newestDoc = docs[docs.length - 1];
       setLatestData({
         temperature: formatOneDecimal(newestDoc.temperature),
@@ -102,7 +101,6 @@ function Dashboard() {
         timestamp: newestDoc.timestamp,
       });
 
-      // Build an array of log lines for each sensor field
       const lines = [];
       docs.forEach((docData) => {
         let timeObj = new Date(0);
@@ -132,11 +130,9 @@ function Dashboard() {
           }
         });
       });
-      // Give each line an ID
       lines.forEach((line, idx) => {
         line.id = idx + 1;
       });
-      // Store the full logs array instead of slicing immediately
       setRawDashboardLogs(lines);
     });
 
@@ -170,11 +166,9 @@ function Dashboard() {
       .catch((err) => console.error(err));
   }, []);
 
-  // Filter logs to include only those related to an active sensor.
-  // Then, display only the last five of these filtered logs.
-  const filteredDashboardLogs = activeSensors.length
+  const filteredDashboardLogs = sensors.length
     ? rawDashboardLogs.filter((log) =>
-        activeSensors.some((sensor) =>
+        sensors.some((sensor) =>
           log.action.toLowerCase().includes(sensor.toLowerCase())
         )
       )
@@ -189,7 +183,7 @@ function Dashboard() {
         <div className={styles.sensorDataContainer}>
           <div className={styles.sensorData}>
             <h3>Latest Sensor Data</h3>
-            {activeSensors.includes("Temperature") && (
+            {sensors.includes("Temperature") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
                   <label><strong>Temperature:</strong></label>
@@ -200,7 +194,7 @@ function Dashboard() {
                 </div>
               </div>
             )}
-            {activeSensors.includes("Humidity") && (
+            {sensors.includes("Humidity") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
                   <label><strong>Humidity:</strong></label>
@@ -211,7 +205,7 @@ function Dashboard() {
                 </div>
               </div>
             )}
-            {activeSensors.includes("Soil Moisture") && (
+            {sensors.includes("Soil Moisture") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
                   <label><strong>Soil Moisture:</strong></label>
@@ -222,7 +216,7 @@ function Dashboard() {
                 </div>
               </div>
             )}
-            {activeSensors.includes("Water Level") && (
+            {sensors.includes("Water Level") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
                   <label><strong>Water Level:</strong></label>
@@ -233,7 +227,7 @@ function Dashboard() {
                 </div>
               </div>
             )}
-            {activeSensors.includes("Light") && (
+            {sensors.includes("Light") && (
               <>
                 <div className={styles.sensorRow}>
                   <div className={styles.sensorLabel}>

@@ -7,9 +7,9 @@ import styles from "../Graph.module.css";
 import { SensorContext } from "../SensorContext";
 
 const Graph = () => {
-  const { activeSensors } = useContext(SensorContext);
+  const { activeSensors, selectedInstance } = useContext(SensorContext);
+  const sensors = activeSensors[selectedInstance] || [];
   const [sensorData, setSensorData] = useState([]);
-  // Default selection is "all" to show all active sensors.
   const [selectedField, setSelectedField] = useState("all");
 
   useEffect(() => {
@@ -31,7 +31,6 @@ const Graph = () => {
     return () => unsub();
   }, []);
 
-  // Build arrays for each sensor field
   const timestamps = [];
   const humidityData = [];
   const temperatureData = [];
@@ -65,7 +64,6 @@ const Graph = () => {
     waterLevelData.push(entry.waterLevel);
   });
 
-  // Define colors for each dataset
   const fieldColors = {
     humidity: "rgba(54, 162, 235, 1)",
     temperature: "rgba(255, 99, 132, 1)",
@@ -77,7 +75,7 @@ const Graph = () => {
   let chartData;
   if (selectedField === "all") {
     const datasets = [];
-    activeSensors.forEach((sensor) => {
+    sensors.forEach((sensor) => {
       let labelName = "";
       let dataArr = [];
       let color = "";
@@ -122,8 +120,7 @@ const Graph = () => {
     });
     chartData = { labels: timestamps, datasets };
   } else {
-    // When a specific sensor is selected
-    let sensorName = selectedField; // e.g. "Temperature"
+    let sensorName = selectedField;
     let labelName = "";
     let dataArr = [];
     let color = "";
@@ -208,7 +205,7 @@ const Graph = () => {
   return (
     <div className={styles.content}>
       <h2>Sensor Data Over Time</h2>
-      {activeSensors.length === 0 ? (
+      {sensors.length === 0 ? (
         <p>Please select a sensor in the Sensor tab to view graphs.</p>
       ) : (
         <div className={styles.graphPanel}>
@@ -218,7 +215,7 @@ const Graph = () => {
             onChange={(e) => setSelectedField(e.target.value)}
           >
             <option value="all">Show All</option>
-            {activeSensors.map((sensor) => (
+            {sensors.map((sensor) => (
               <option key={sensor} value={sensor}>
                 {sensor}
               </option>
