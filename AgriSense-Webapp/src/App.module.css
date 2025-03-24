@@ -2,44 +2,54 @@
 
 /* Fixed Navigation Bar */
 .navBar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background-color: #2d2d44;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 15px;
-    border-bottom: 2px solid #8ecae6;
-    z-index: 1000;
-  }
-  
-  /* Navigation Links */
-  .navLink {
-    color: #8ecae6;
-    text-decoration: none;
-    font-size: 1.5rem;
-    margin: 0 20px;
-    padding: 8px 15px;
-    transition: color 0.3s ease, background-color 0.3s ease;
-    border-radius: 4px;
-  }
-  
-  .navLink:hover {
-    background-color: #8ecae6;
-    color: #2d2d44;
-  }
-  
-  /* A generic container for the page content, offset below the fixed nav. */
-  .container {
-    padding-top: 100px; /* Adds spacing below the fixed nav */
-    max-width: 1200px;
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-  }
-  
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #2d2d44;
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 2px solid #8ecae6;
+  z-index: 1000;
+}
+
+/* Container for the links themselves */
+.navLinksContainer {
+  flex: 1;                 /* Fill remaining space */
+  display: flex;
+  justify-content: center; /* Center the links */
+  gap: 20px;               /* Optional spacing between links */
+}
+
+/* Navigation Links */
+.navLink {
+  color: #8ecae6;
+  text-decoration: none;
+  font-size: 1.5rem;
+  padding: 8px 15px;
+  border-radius: 4px;
+  transition: color 0.3s ease, background-color 0.3s ease;
+}
+
+.navLink:hover {
+  background-color: #8ecae6;
+  color: #2d2d44;
+}
+
+/* Dropdown container for instance selection on the far right */
+.instanceDropdownContainer {
+  margin-left: auto;  /* Push this to the far right */
+}
+
+/* Main Container offset below the fixed nav */
+.container {
+  padding-top: 100px; /* Adds spacing below the fixed nav */
+  max-width: 1200px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}

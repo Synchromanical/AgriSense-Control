@@ -3,34 +3,31 @@ import { SensorContext } from "../SensorContext";
 import styles from "../Sensor.module.css"; 
 
 const Sensor = () => {
-  const { activeSensors, addSensor, removeSensor, clearSensors } = useContext(SensorContext);
+  const { activeSensors, addSensor, removeSensor, clearSensors, selectedInstance } = useContext(SensorContext);
   const [selectedSensor, setSelectedSensor] = useState("");
-  const [selectedNode, setSelectedNode] = useState("1");
+  // Local state to let the user choose which node the sensor is saved to
+  const [selectedNode, setSelectedNode] = useState(selectedInstance);
 
-  // Load the last selected sensor from localStorage if available.
+  // Sync the local selectedNode with the global selectedInstance when it changes
   useEffect(() => {
-    const savedSensor = localStorage.getItem("selectedSensor");
-    if (savedSensor) {
-      setSelectedSensor(savedSensor);
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("selectedSensor", selectedSensor);
-  }, [selectedSensor]);
+    setSelectedNode(selectedInstance);
+  }, [selectedInstance]);
 
   const handleSaveInstance = () => {
     if (!selectedSensor) return;
-    addSensor(selectedSensor);
+    addSensor(selectedNode, selectedSensor);
   };
 
   const handleDeleteSingle = (sensor) => {
-    removeSensor(sensor);
+    removeSensor(selectedInstance, sensor);
   };
 
   const handleClearAll = () => {
-    clearSensors();
+    clearSensors(selectedInstance);
   };
+
+  // Only display sensors saved for the current global instance
+  const sensorsForCurrentInstance = activeSensors[selectedInstance] || [];
 
   return (
     <div className={styles.sensorContent}>
@@ -96,12 +93,12 @@ const Sensor = () => {
         </div>
 
         {/* Active Sensors list */}
-        <h4 className={styles.automationHeading}>Active Sensors</h4>
-        {activeSensors.length === 0 && <p>No active sensors yet.</p>}
-        {activeSensors.map((sensor, index) => (
+        <h4 className={styles.automationHeading}>Active Sensors (Instance {selectedInstance})</h4>
+        {sensorsForCurrentInstance.length === 0 && <p>No active sensors yet.</p>}
+        {sensorsForCurrentInstance.map((sensor, index) => (
           <div key={index} className={styles.automationItemRow}>
             <div>
-              <strong>{sensor}</strong> (Node {selectedNode})
+              <strong>{sensor}</strong> (Node {selectedInstance})
             </div>
             <div>
               <button
@@ -113,7 +110,7 @@ const Sensor = () => {
             </div>
           </div>
         ))}
-        {activeSensors.length > 0 && (
+        {sensorsForCurrentInstance.length > 0 && (
           <button onClick={handleClearAll} className={`${styles.setButton} ${styles.automationClearButton}`}>
             Clear All Sensors
           </button>
