@@ -4,39 +4,11 @@ import { db } from "../firebaseConfig";
 import styles from "../Dashboard.module.css";
 import { SensorContext } from "../SensorContext";
 
+// Utility to format certain numeric fields to one decimal if needed
 function formatOneDecimal(value) {
   const num = parseFloat(value);
   if (isNaN(num)) return "";
   return num.toFixed(1);
-}
-
-function computeNextOccurrence(automation) {
-  if (automation.type !== "time-based" || !automation.enabled) return null;
-  if (!automation.dateTime) return null;
-  const baseDate = new Date(automation.dateTime);
-  if (isNaN(baseDate.getTime())) return null;
-  const now = new Date();
-  function addDays(date, days) {
-    const copy = new Date(date);
-    copy.setDate(copy.getDate() + days);
-    return copy;
-  }
-  let next = new Date(baseDate);
-  for (let i = 0; i < 50; i++) {
-    if (next >= now) {
-      return next;
-    }
-    if (automation.repeatSchedule === "none") {
-      return null;
-    } else if (automation.repeatSchedule === "daily") {
-      next = addDays(next, 1);
-    } else if (automation.repeatSchedule === "weekly") {
-      next = addDays(next, 7);
-    } else {
-      return null;
-    }
-  }
-  return null;
 }
 
 const Dashboard = () => {
@@ -55,11 +27,13 @@ const Dashboard = () => {
     timestamp: null,
   });
   const [rawDashboardLogs, setRawDashboardLogs] = useState([]);
-  const [upcomingAutomations, setUpcomingAutomations] = useState([]);
 
-  // Subscribe to necessary collections (based on active sensors) and merge
+  // In the old version, you might have had "upcomingAutomations."
+  // We rename it to a simpler "allAutomations" to store *all* documents from "automations".
+  const [allAutomations, setAllAutomations] = useState([]);
+
+  // 1. Subscribe to sensor collections based on user’s active sensors
   useEffect(() => {
-    // Identify needed collections
     const boardsNeeded = new Set();
     if (sensors.includes("Temperature") || sensors.includes("Humidity") || sensors.includes("Soil Moisture")) {
       boardsNeeded.add("GSMB");
@@ -73,14 +47,16 @@ const Dashboard = () => {
 
     const unsubscribes = [];
     const readingsByCollection = {};
+
     boardsNeeded.forEach((colName) => {
       readingsByCollection[colName] = [];
-      const q = query(collection(db, colName), orderBy("timestamp", "asc"));
+      const colRef = collection(db, colName);
+      const q = query(colRef, orderBy("timestamp", "asc"));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         readingsByCollection[colName] = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-          boardType: colName,
+          boardType: colName, // tag the doc with its collection name
         }));
         const mergedAll = Object.values(readingsByCollection).flat();
         mergedAll.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -92,7 +68,8 @@ const Dashboard = () => {
     return () => unsubscribes.forEach((u) => u());
   }, [sensors]);
 
-  // Combine the latest doc from each board
+  // 2. Combine the latest doc from each board into `latestData`
+  //    and build logs from mergedReadings.
   useEffect(() => {
     if (mergedReadings.length === 0) {
       setLatestData({
@@ -114,7 +91,7 @@ const Dashboard = () => {
     const hpcbDocs = mergedReadings.filter((doc) => doc.boardType === "HPCB");
     const nscbDocs = mergedReadings.filter((doc) => doc.boardType === "NSCB");
 
-    // Latest doc for each
+    // Latest doc from each board
     const latestGSMB = gsmDocs.length
       ? gsmDocs.reduce((a, b) => (new Date(a.timestamp) > new Date(b.timestamp) ? a : b))
       : null;
@@ -125,7 +102,7 @@ const Dashboard = () => {
       ? nscbDocs.reduce((a, b) => (new Date(a.timestamp) > new Date(b.timestamp) ? a : b))
       : null;
 
-    // Merge them
+    // Merge them into a single object
     const combinedLatest = {
       temperature: latestGSMB ? formatOneDecimal(latestGSMB.temperature) : "",
       humidity: latestGSMB ? formatOneDecimal(latestGSMB.humidity) : "",
@@ -136,7 +113,7 @@ const Dashboard = () => {
       waterLevel: latestNSCB ? formatOneDecimal(latestNSCB.waterLevel) : "",
     };
 
-    // Choose a combined timestamp if desired
+    // Choose a combined timestamp if you like
     const timestamps = [];
     if (latestGSMB) timestamps.push(new Date(latestGSMB.timestamp));
     if (latestHPCB) timestamps.push(new Date(latestHPCB.timestamp));
@@ -183,44 +160,34 @@ const Dashboard = () => {
     setRawDashboardLogs(lines);
   }, [mergedReadings]);
 
-  // Subscribe to automations
+  // 3. Subscribe to *all* automations from Firestore
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
       const docs = snapshot.docs.map((d) => ({
         id: d.id,
         ...d.data(),
       }));
-      const upcoming = [];
-      docs.forEach((auto) => {
-        const next = computeNextOccurrence(auto);
-        if (next) {
-          upcoming.push({
-            ...auto,
-            nextOccurrence: next,
-          });
-        }
-      });
-      upcoming.sort((a, b) => a.nextOccurrence - b.nextOccurrence);
-      const top3 = upcoming.slice(0, 3);
-      setUpcomingAutomations(top3);
+      // This array now includes *all* automations, regardless of type.
+      setAllAutomations(docs);
     });
     return () => unsub();
   }, []);
 
-  // Filter logs to show only for the sensors user selected
+  // 4. Optionally filter logs so only sensors the user selected are shown
   const filteredDashboardLogs = sensors.length
     ? rawDashboardLogs.filter((log) =>
-        sensors.some((sensor) =>
-          log.action.toLowerCase().includes(sensor.toLowerCase())
-        )
+        sensors.some((sensor) => log.action.toLowerCase().includes(sensor.toLowerCase()))
       )
     : [];
 
+  // For display, we show the last 5 logs in reverse order
   const displayedDashboardLogs = filteredDashboardLogs.slice(-5).reverse();
 
   return (
     <div className={styles.content}>
       <h2>Dashboard</h2>
+
+      {/* Sensor Data Display */}
       <div className={styles.dashboardContainer}>
         <div className={styles.sensorDataContainer}>
           <div className={styles.sensorData}>
@@ -229,9 +196,7 @@ const Dashboard = () => {
             {sensors.includes("Temperature") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label>
-                    <strong>Temperature:</strong>
-                  </label>
+                  <label><strong>Temperature:</strong></label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input
@@ -248,9 +213,7 @@ const Dashboard = () => {
             {sensors.includes("Humidity") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label>
-                    <strong>Humidity:</strong>
-                  </label>
+                  <label><strong>Humidity:</strong></label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input
@@ -267,9 +230,7 @@ const Dashboard = () => {
             {sensors.includes("Soil Moisture") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label>
-                    <strong>Soil Moisture:</strong>
-                  </label>
+                  <label><strong>Soil Moisture:</strong></label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input
@@ -286,9 +247,7 @@ const Dashboard = () => {
             {sensors.includes("Water Level") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label>
-                    <strong>Water Level:</strong>
-                  </label>
+                  <label><strong>Water Level:</strong></label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input
@@ -306,9 +265,7 @@ const Dashboard = () => {
               <>
                 <div className={styles.sensorRow}>
                   <div className={styles.sensorLabel}>
-                    <label>
-                      <strong>Light:</strong>
-                    </label>
+                    <label><strong>Light:</strong></label>
                   </div>
                   <div className={styles.sensorInputContainer}>
                     <input
@@ -322,68 +279,25 @@ const Dashboard = () => {
                 </div>
                 <div className={styles.sensorRow}>
                   <div className={styles.sensorLabel}>
-                    <label>
-                      <strong>Light State:</strong>
-                    </label>
+                    <label><strong>Light State:</strong></label>
                   </div>
                   <div className={styles.sensorInputContainer}>
-                    <div className={styles.radioGroup}>
-                      <label>
-                        <input
-                          type="radio"
-                          name="lightState"
-                          value="true"
-                          checked={latestData.lightState === true}
-                          readOnly
-                        />
-                        On
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="lightState"
-                          value="false"
-                          checked={latestData.lightState === false}
-                          readOnly
-                        />
-                        Off
-                      </label>
+                    <div>
+                      {latestData.lightState ? "On" : "Off"}
                     </div>
                   </div>
                 </div>
               </>
             )}
 
-            {/* Fan State row: displayed below Light State if user has "Fan" */}
             {sensors.includes("Fan") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label>
-                    <strong>Fan State:</strong>
-                  </label>
+                  <label><strong>Fan State:</strong></label>
                 </div>
                 <div className={styles.sensorInputContainer}>
-                  <div className={styles.radioGroup}>
-                    <label>
-                      <input
-                        type="radio"
-                        name="fanState"
-                        value="true"
-                        checked={latestData.fanState === true}
-                        readOnly
-                      />
-                      On
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="fanState"
-                        value="false"
-                        checked={latestData.fanState === false}
-                        readOnly
-                      />
-                      Off
-                    </label>
+                  <div>
+                    {latestData.fanState ? "On" : "Off"}
                   </div>
                 </div>
               </div>
@@ -391,6 +305,7 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Logs on the right side */}
         <div className={styles.dashboardLogsContainer}>
           <h3>Latest Logs</h3>
           {displayedDashboardLogs.length > 0 ? (
@@ -418,31 +333,30 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Instead of "Upcoming Automations," we now show *all* automations. */}
       <div className={styles.dashboardAutomationsContainer}>
-        <h3>Upcoming Automations</h3>
-        {upcomingAutomations.length === 0 ? (
-          <p>No upcoming time-based automations.</p>
+        <h3>All Automations</h3>
+        {allAutomations.length === 0 ? (
+          <p>No automations found.</p>
         ) : (
           <table className={styles.upcomingAutomationsTable}>
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Next Occurrence</th>
-                <th>Repeat</th>
+                <th>Type</th>
                 <th>Action</th>
+                <th>Enabled?</th>
               </tr>
             </thead>
             <tbody>
-              {upcomingAutomations.map((auto) => {
-                const next = auto.nextOccurrence
-                  ? auto.nextOccurrence.toLocaleString()
-                  : "N/A";
+              {allAutomations.map((auto) => {
                 return (
                   <tr key={auto.id}>
                     <td>{auto.name}</td>
-                    <td>{next}</td>
-                    <td>{auto.repeatSchedule}</td>
+                    <td>{auto.type}</td>
                     <td>{auto.action}</td>
+                    {/* If "enabled" is stored as a boolean: */}
+                    <td>{typeof auto.enabled === "boolean" ? (auto.enabled ? "Yes" : "No") : "N/A"}</td>
                   </tr>
                 );
               })}

@@ -61,22 +61,40 @@ const ControlPanel = () => {
     lightState: false,
     fanState: false,
   });
-  // Automations state remains unchanged…
   const [automations, setAutomations] = useState([]);
   const [selectedAutomationId, setSelectedAutomationId] = useState("");
+
+  // Board type for automations – "NSCB" or "HPCB"
+  const [automationBoardType, setAutomationBoardType] = useState("NSCB");
+
+  // The automationForm holds user inputs.
+  // Saved fields include: name, type, enabled, and then type-specific settings.
   const [automationForm, setAutomationForm] = useState({
     name: "",
-    type: "time-based",
+    type: "time-based", // Options: "time-based", "threshold-based", "time-length-based"
     enabled: true,
     dateTime: "",
-    repeatSchedule: "none",
     sensorField: "temperature",
     operator: ">",
     thresholdValue: "",
-    action: "turnFanOn",
+    action: "addWater", // default for NSCB
+    timeLength: "",
+    timeUnit: "Second",
   });
 
-  // Listen for sensor updates from appropriate collections based on active sensors.
+  // Subscribe to automations so that saved automations appear in the UI.
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "automations"), (snapshot) => {
+      const docs = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAutomations(docs);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Listen for sensor updates from the needed collections.
   useEffect(() => {
     const collectionsNeeded = {};
     sensors.forEach((sensorName) => {
@@ -87,7 +105,6 @@ const ControlPanel = () => {
           collectionsNeeded[colName] = new Set();
         }
         collectionsNeeded[colName].add(sensorMapping[key].field);
-        // For "Light", also listen for "lightState"
         if (key === "light") {
           collectionsNeeded[colName].add("lightState");
         }
@@ -133,16 +150,7 @@ const ControlPanel = () => {
     return () => unsubscribes.forEach((u) => u());
   }, [sensors]);
 
-  /*
-    Updated write function:
-    – For each active board (based on sensors), create a full document that always includes all required fields.
-    For GSMB: temperature, humidity, soilMoisture, boardType ("GSMB"), timestamp.
-    For HPCB: light, lightState, fanState, boardType ("HPCB"), timestamp.
-    For NSCB: waterLevel, boardType ("NSCB"), timestamp.
-    Values are taken from updatedFields if provided; otherwise fallback to latestData or default.
-  */
   async function createNewReading(updatedFields) {
-    // Determine active boards based on active sensors.
     const activeBoards = new Set();
     sensors.forEach((sensorName) => {
       const key = sensorName.toLowerCase().replace(/\s/g, "");
@@ -151,7 +159,6 @@ const ControlPanel = () => {
       }
     });
     const timestamp = getTimestampString();
-    // Build a full document for each board.
     for (const board of activeBoards) {
       let docData = { boardType: board, timestamp };
       if (board === "GSMB") {
@@ -239,7 +246,18 @@ const ControlPanel = () => {
     await createNewReading({ waterLevel: 100 });
   };
 
-  // Automation handlers remain unchanged…
+  // Helper to map action based on board type.
+  const getStoredAction = () => {
+    if (automationBoardType === "NSCB") {
+      if (automationForm.action === "addWater") return "water";
+      if (automationForm.action === "addNutrient") return "nutrient";
+    } else if (automationBoardType === "HPCB") {
+      if (automationForm.action === "turnFanOn") return "fan";
+      if (automationForm.action === "turnLightOn") return "light";
+    }
+    return automationForm.action;
+  };
+
   const handleAutomationFormChange = (field, value) => {
     setAutomationForm((prev) => ({
       ...prev,
@@ -247,47 +265,59 @@ const ControlPanel = () => {
     }));
   };
 
+  // Reset the form to default values (enabled defaults to true).
+  const resetAutomationForm = () => {
+    setAutomationForm({
+      name: "",
+      type: "time-based",
+      enabled: true,
+      dateTime: "",
+      sensorField: "temperature",
+      operator: ">",
+      thresholdValue: "",
+      action: automationBoardType === "NSCB" ? "addWater" : "turnFanOn",
+      timeLength: "",
+      timeUnit: "Second",
+    });
+  };
+
+  // When creating a new automation, build a payload including enabled.
   const handleCreateAutomation = async () => {
     try {
-      const docRef = await addDoc(collection(db, "automations"), {
-        ...automationForm,
-        thresholdValue: automationForm.thresholdValue
+      let payload = {
+        name: automationForm.name,
+        type: automationForm.type,
+        boardType: automationBoardType,
+        enabled: automationForm.enabled,
+        action: getStoredAction(),
+      };
+      if (automationForm.type === "time-based") {
+        payload.dateTime = automationForm.dateTime;
+      } else if (automationForm.type === "threshold-based") {
+        payload.sensorField = automationForm.sensorField;
+        payload.operator = automationForm.operator;
+        payload.thresholdValue = automationForm.thresholdValue
           ? parseFloat(automationForm.thresholdValue)
-          : "",
-      });
+          : "";
+      } else if (automationForm.type === "time-length-based") {
+        payload.timeLength = automationForm.timeLength ? parseFloat(automationForm.timeLength) : 0;
+        payload.timeLengthType = automationForm.timeUnit.toLowerCase();
+      }
+      const docRef = await addDoc(collection(db, "automations"), payload);
       console.log("Created automation with ID:", docRef.id);
-      setAutomationForm({
-        name: "",
-        type: "time-based",
-        enabled: true,
-        dateTime: "",
-        repeatSchedule: "none",
-        sensorField: "temperature",
-        operator: ">",
-        thresholdValue: "",
-        action: "turnFanOn",
-      });
+      resetAutomationForm();
       setSelectedAutomationId(docRef.id);
     } catch (error) {
       console.error("Error creating automation:", error);
     }
   };
 
+  // When selecting a saved automation, repopulate the form with its saved values.
   const handleSelectAutomation = (e) => {
     const id = e.target.value;
     setSelectedAutomationId(id);
     if (!id) {
-      setAutomationForm({
-        name: "",
-        type: "time-based",
-        enabled: true,
-        dateTime: "",
-        repeatSchedule: "none",
-        sensorField: "temperature",
-        operator: ">",
-        thresholdValue: "",
-        action: "turnFanOn",
-      });
+      resetAutomationForm();
       return;
     }
     const found = automations.find((a) => a.id === id);
@@ -297,25 +327,43 @@ const ControlPanel = () => {
         type: found.type ?? "time-based",
         enabled: typeof found.enabled === "boolean" ? found.enabled : true,
         dateTime: found.dateTime ?? "",
-        repeatSchedule: found.repeatSchedule ?? "none",
         sensorField: found.sensorField ?? "temperature",
         operator: found.operator ?? ">",
-        thresholdValue: found.thresholdValue?.toString() ?? "",
-        action: found.action ?? "turnFanOn",
+        thresholdValue: found.thresholdValue ? found.thresholdValue.toString() : "",
+        action: found.action ?? (automationBoardType === "NSCB" ? "addWater" : "turnFanOn"),
+        timeLength: found.timeLength ? found.timeLength.toString() : "",
+        timeUnit: found.timeLengthType
+          ? found.timeLengthType.charAt(0).toUpperCase() + found.timeLengthType.slice(1)
+          : "Second",
       });
     }
   };
 
+  // When updating an automation, include enabled in the payload.
   const handleUpdateAutomation = async () => {
     if (!selectedAutomationId) return;
     try {
-      const docRef = doc(db, "automations", selectedAutomationId);
-      await updateDoc(docRef, {
-        ...automationForm,
-        thresholdValue: automationForm.thresholdValue
+      let payload = {
+        name: automationForm.name,
+        type: automationForm.type,
+        boardType: automationBoardType,
+        enabled: automationForm.enabled,
+        action: getStoredAction(),
+      };
+      if (automationForm.type === "time-based") {
+        payload.dateTime = automationForm.dateTime;
+      } else if (automationForm.type === "threshold-based") {
+        payload.sensorField = automationForm.sensorField;
+        payload.operator = automationForm.operator;
+        payload.thresholdValue = automationForm.thresholdValue
           ? parseFloat(automationForm.thresholdValue)
-          : "",
-      });
+          : "";
+      } else if (automationForm.type === "time-length-based") {
+        payload.timeLength = automationForm.timeLength ? parseFloat(automationForm.timeLength) : 0;
+        payload.timeLengthType = automationForm.timeUnit.toLowerCase();
+      }
+      const docRef = doc(db, "automations", selectedAutomationId);
+      await updateDoc(docRef, payload);
       console.log("Updated automation:", selectedAutomationId);
     } catch (error) {
       console.error("Error updating automation:", error);
@@ -342,17 +390,7 @@ const ControlPanel = () => {
         await deleteDoc(doc(db, "automations", autoDoc.id));
       }
       setSelectedAutomationId("");
-      setAutomationForm({
-        name: "",
-        type: "time-based",
-        enabled: true,
-        dateTime: "",
-        repeatSchedule: "none",
-        sensorField: "temperature",
-        operator: ">",
-        thresholdValue: "",
-        action: "turnFanOn",
-      });
+      resetAutomationForm();
     } catch (error) {
       console.error("Error clearing automations:", error);
     }
@@ -363,20 +401,27 @@ const ControlPanel = () => {
     try {
       await deleteDoc(doc(db, "automations", selectedAutomationId));
       setSelectedAutomationId("");
-      setAutomationForm({
-        name: "",
-        type: "time-based",
-        enabled: true,
-        dateTime: "",
-        repeatSchedule: "none",
-        sensorField: "temperature",
-        operator: ">",
-        thresholdValue: "",
-        action: "turnFanOn",
-      });
+      resetAutomationForm();
     } catch (error) {
       console.error("Error deleting automation:", error);
     }
+  };
+
+  // Compute dynamic action options based on board type.
+  const actionOptions =
+    automationBoardType === "NSCB"
+      ? [
+          { value: "addWater", label: "Add Water" },
+          { value: "addNutrient", label: "Add Nutrient" },
+        ]
+      : [
+          { value: "turnFanOn", label: "Turn Fan On" },
+          { value: "turnLightOn", label: "Turn Light On" },
+        ];
+
+  // Display automation label using its name and type.
+  const computeAutomationLabel = (auto) => {
+    return `${auto.name} (${auto.type})`;
   };
 
   return (
@@ -388,6 +433,7 @@ const ControlPanel = () => {
           <p>Please select a sensor in the Sensor tab to control.</p>
         ) : (
           <div className={styles.controlPanelGrid}>
+            {/* Sensor control rows (Temperature, Humidity, etc.) remain unchanged */}
             {sensors.includes("Temperature") && (
               <>
                 <div className={styles.rowLabel}>
@@ -401,9 +447,7 @@ const ControlPanel = () => {
                   <input
                     type="number"
                     value={editedData.temperature}
-                    onChange={(e) =>
-                      setEditedData((prev) => ({ ...prev, temperature: e.target.value }))
-                    }
+                    onChange={(e) => setEditedData((prev) => ({ ...prev, temperature: e.target.value }))}
                     onKeyDown={handleKeyDown}
                     className={styles.sensorInput}
                   />
@@ -429,9 +473,7 @@ const ControlPanel = () => {
                   <input
                     type="number"
                     value={editedData.humidity}
-                    onChange={(e) =>
-                      setEditedData((prev) => ({ ...prev, humidity: e.target.value }))
-                    }
+                    onChange={(e) => setEditedData((prev) => ({ ...prev, humidity: e.target.value }))}
                     onKeyDown={handleKeyDown}
                     className={styles.sensorInput}
                   />
@@ -457,9 +499,7 @@ const ControlPanel = () => {
                   <input
                     type="number"
                     value={editedData.soilMoisture}
-                    onChange={(e) =>
-                      setEditedData((prev) => ({ ...prev, soilMoisture: e.target.value }))
-                    }
+                    onChange={(e) => setEditedData((prev) => ({ ...prev, soilMoisture: e.target.value }))}
                     onKeyDown={handleKeyDown}
                     className={styles.sensorInput}
                   />
@@ -485,9 +525,7 @@ const ControlPanel = () => {
                   <input
                     type="number"
                     value={editedData.light}
-                    onChange={(e) =>
-                      setEditedData((prev) => ({ ...prev, light: e.target.value }))
-                    }
+                    onChange={(e) => setEditedData((prev) => ({ ...prev, light: e.target.value }))}
                     onKeyDown={handleKeyDown}
                     className={styles.sensorInput}
                   />
@@ -511,9 +549,7 @@ const ControlPanel = () => {
                       name="lightState"
                       value="true"
                       checked={editedData.lightState === true}
-                      onChange={() =>
-                        setEditedData((prev) => ({ ...prev, lightState: true }))
-                      }
+                      onChange={() => setEditedData((prev) => ({ ...prev, lightState: true }))}
                     />
                     On
                   </label>
@@ -523,9 +559,7 @@ const ControlPanel = () => {
                       name="lightState"
                       value="false"
                       checked={editedData.lightState === false}
-                      onChange={() =>
-                        setEditedData((prev) => ({ ...prev, lightState: false }))
-                      }
+                      onChange={() => setEditedData((prev) => ({ ...prev, lightState: false }))}
                     />
                     Off
                   </label>
@@ -538,78 +572,59 @@ const ControlPanel = () => {
               </>
             )}
             {sensors.includes("Water Level") && (
-            <>
-              <div className={styles.rowLabel}>
-                <strong>Water Level:</strong>
-              </div>
-              <div className={styles.rowLatest}>
-                <input
-                  type="number"
-                  value={latestData.waterLevel}
-                  readOnly
-                  className={styles.sensorInput}
-                />
-                <span className={styles.unit}>%</span>
-              </div>
-              <div className={styles.rowButton}>
-                <button onClick={handleFillWater} className={styles.setButton}>
-                  Fill Water
-                </button>
-              </div>
-              {/* Empty cell for the Set column */}
-              <div className={styles.rowSet}></div>
-            </>
-          )}
-
-           {sensors.includes("Fan") && (
-            <>
-              <div className={styles.rowLabel}>
-                <strong>Fan State:</strong>
-              </div>
-              <div className={styles.rowLatest}>
-                <input
-                  type="text"
-                  value={latestData.fanState ? "On" : "Off"}
-                  readOnly
-                  className={styles.sensorInput}
-                />
-              </div>
-              <div className={styles.rowButton}>
-                <label className={styles.automationRadioLabel}>
-                  <input
-                    type="radio"
-                    name="fanState"
-                    value="true"
-                    checked={editedData.fanState === true}
-                    onChange={() =>
-                      setEditedData((prev) => ({ ...prev, fanState: true }))
-                    }
-                  />
-                  On
-                </label>
-                <label className={styles.automationRadioLabel}>
-                  <input
-                    type="radio"
-                    name="fanState"
-                    value="false"
-                    checked={editedData.fanState === false}
-                    onChange={() =>
-                      setEditedData((prev) => ({ ...prev, fanState: false }))
-                    }
-                  />
-                  Off
-                </label>
-              </div>
-              <div className={styles.rowSet}>
-                <button
-                  onClick={() => handleSetSensor("fanState")}
-                  className={styles.setButton}
-                >
-                  Set
-                </button>
-              </div>
-            </>
-          )}
+              <>
+                <div className={styles.rowLabel}>
+                  <strong>Water Level:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="number" value={latestData.waterLevel} readOnly className={styles.sensorInput} />
+                  <span className={styles.unit}>%</span>
+                </div>
+                <div className={styles.rowButton}>
+                  <button onClick={handleFillWater} className={styles.setButton}>
+                    Fill Water
+                  </button>
+                </div>
+                <div className={styles.rowSet}></div>
+              </>
+            )}
+            {sensors.includes("Fan") && (
+              <>
+                <div className={styles.rowLabel}>
+                  <strong>Fan State:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="text" value={latestData.fanState ? "On" : "Off"} readOnly className={styles.sensorInput} />
+                </div>
+                <div className={styles.rowButton}>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="fanState"
+                      value="true"
+                      checked={editedData.fanState === true}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fanState: true }))}
+                    />
+                    On
+                  </label>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="fanState"
+                      value="false"
+                      checked={editedData.fanState === false}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fanState: false }))}
+                    />
+                    Off
+                  </label>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("fanState")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -619,34 +634,54 @@ const ControlPanel = () => {
           <strong>Purpose of Automation</strong>
           <br />
           Automations let you perform actions (e.g., turn fan on/off, fill water) automatically based on specific conditions.
-          <br />
-          Time-based (scheduled) or Threshold-based (react to sensor data).
         </p>
         <div className={styles.automationTopSelect}>
           <label className={styles.automationSelectLabel}>Saved Automations:</label>
           <select value={selectedAutomationId} onChange={handleSelectAutomation} className={styles.automationDropdown}>
             <option value="">-- Create New --</option>
-            {automations.map((auto) => {
-              const display = `${auto.name} (${auto.type})`;
-              return (
-                <option key={auto.id} value={auto.id}>
-                  {display}
-                </option>
-              );
-            })}
+            {automations.map((auto) => (
+              <option key={auto.id} value={auto.id}>
+                {computeAutomationLabel(auto)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.automationBoardTypeContainer}>
+          <label className={styles.automationSelectLabel}>Board Type:</label>
+          <select
+            value={automationBoardType}
+            onChange={(e) => {
+              const newBoardType = e.target.value;
+              setAutomationBoardType(newBoardType);
+              handleAutomationFormChange("action", newBoardType === "NSCB" ? "addWater" : "turnFanOn");
+            }}
+            className={styles.automationDropdown}
+          >
+            <option value="NSCB">NSCB</option>
+            <option value="HPCB">HPCB</option>
           </select>
         </div>
         <div className={styles.automationGrid4col}>
           <div className={styles.automationLeft}>
             <label className={styles.automationStep}>Name</label>
-            <input type="text" className={styles.automationNameInput} value={automationForm.name} onChange={(e) => handleAutomationFormChange("name", e.target.value)} />
+            <input
+              type="text"
+              className={styles.automationNameInput}
+              value={automationForm.name}
+              onChange={(e) => handleAutomationFormChange("name", e.target.value)}
+            />
           </div>
           <div className={styles.automationMiddle}>
             <label className={styles.automationStep}>Type</label>
             <div className={styles.automationSelectBlock}>
-              <select value={automationForm.type} onChange={(e) => handleAutomationFormChange("type", e.target.value)} className={styles.automationDropdown}>
+              <select
+                value={automationForm.type}
+                onChange={(e) => handleAutomationFormChange("type", e.target.value)}
+                className={styles.automationDropdown}
+              >
                 <option value="time-based">Time-Based</option>
                 <option value="threshold-based">Threshold-Based</option>
+                <option value="time-length-based">Time-Length-Based</option>
               </select>
             </div>
           </div>
@@ -654,12 +689,40 @@ const ControlPanel = () => {
             {automationForm.type === "time-based" ? (
               <>
                 <label className={styles.automationLabelMargin}>Date/Time</label>
-                <input type="datetime-local" className={styles.automationDatetimeInput} value={automationForm.dateTime} onChange={(e) => handleAutomationFormChange("dateTime", e.target.value)} />
+                <input
+                  type="datetime-local"
+                  className={styles.automationDatetimeInput}
+                  value={automationForm.dateTime}
+                  onChange={(e) => handleAutomationFormChange("dateTime", e.target.value)}
+                />
+              </>
+            ) : automationForm.type === "time-length-based" ? (
+              <>
+                <label className={styles.automationLabelMargin}>Time Length</label>
+                <input
+                  type="number"
+                  className={styles.automationDatetimeInput}
+                  value={automationForm.timeLength}
+                  onChange={(e) => handleAutomationFormChange("timeLength", e.target.value)}
+                />
+                <select
+                  className={`${styles.automationDropdown} ${styles.automationSelectMargin}`}
+                  value={automationForm.timeUnit}
+                  onChange={(e) => handleAutomationFormChange("timeUnit", e.target.value)}
+                >
+                  <option value="Second">Second</option>
+                  <option value="Minute">Minute</option>
+                  <option value="Hour">Hour</option>
+                </select>
               </>
             ) : (
               <>
                 <label className={styles.automationLabelMargin}>Sensor Field</label>
-                <select className={`${styles.automationDropdown} ${styles.automationSelectMargin}`} value={automationForm.sensorField} onChange={(e) => handleAutomationFormChange("sensorField", e.target.value)}>
+                <select
+                  className={`${styles.automationDropdown} ${styles.automationSelectMargin}`}
+                  value={automationForm.sensorField}
+                  onChange={(e) => handleAutomationFormChange("sensorField", e.target.value)}
+                >
                   <option value="temperature">Temperature</option>
                   <option value="humidity">Humidity</option>
                   <option value="soilMoisture">Soil Moisture</option>
@@ -667,23 +730,37 @@ const ControlPanel = () => {
                   <option value="waterLevel">Water Level</option>
                 </select>
                 <label className={styles.automationLabelMargin}>Operator</label>
-                <select className={`${styles.automationDropdown} ${styles.automationSelectMargin}`} value={automationForm.operator} onChange={(e) => handleAutomationFormChange("operator", e.target.value)}>
+                <select
+                  className={`${styles.automationDropdown} ${styles.automationSelectMargin}`}
+                  value={automationForm.operator}
+                  onChange={(e) => handleAutomationFormChange("operator", e.target.value)}
+                >
                   <option value=">">&gt;</option>
                   <option value="<">&lt;</option>
                   <option value="=">=</option>
                 </select>
                 <label className={styles.automationLabelMargin}>Threshold</label>
-                <input type="number" className={`${styles.automationNameInput} ${styles.automationSelectMargin}`} value={automationForm.thresholdValue} onChange={(e) => handleAutomationFormChange("thresholdValue", e.target.value)} />
+                <input
+                  type="number"
+                  className={`${styles.automationNameInput} ${styles.automationSelectMargin}`}
+                  value={automationForm.thresholdValue}
+                  onChange={(e) => handleAutomationFormChange("thresholdValue", e.target.value)}
+                />
               </>
             )}
           </div>
           <div className={styles.automationSaved}>
             <label>Action</label>
-            <select className={styles.automationDropdown} value={automationForm.action} onChange={(e) => handleAutomationFormChange("action", e.target.value)}>
-              <option value="turnFanOn">Turn Fan On</option>
-              <option value="turnFanOff">Turn Fan Off</option>
-              <option value="fillWater">Fill Water</option>
-              <option value="sendAlert">Send Alert</option>
+            <select
+              className={styles.automationDropdown}
+              value={automationForm.action}
+              onChange={(e) => handleAutomationFormChange("action", e.target.value)}
+            >
+              {actionOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
             <div className={styles.automationActionButtonsContainer}>
               <button onClick={handleCreateAutomation} className={`${styles.setButton} ${styles.automationSpaceRight}`}>
@@ -700,13 +777,21 @@ const ControlPanel = () => {
           <div className={styles.automationLeftEmpty}></div>
           <div className={styles.automationMiddleEnabled}>
             <label className={styles.automationEnabledLabel}>Enabled?</label>
-            <input type="checkbox" checked={automationForm.enabled} onChange={(e) => handleAutomationFormChange("enabled", e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={automationForm.enabled}
+              onChange={(e) => handleAutomationFormChange("enabled", e.target.checked)}
+            />
           </div>
           <div className={styles.automationRightRepeat}>
             {automationForm.type === "time-based" && (
               <>
                 <label className={styles.automationRepeatLabel}>Repeat</label>
-                <select className={styles.automationDropdownTime} value={automationForm.repeatSchedule} onChange={(e) => handleAutomationFormChange("repeatSchedule", e.target.value)}>
+                <select
+                  className={styles.automationDropdownTime}
+                  value={automationForm.repeatSchedule}
+                  onChange={(e) => handleAutomationFormChange("repeatSchedule", e.target.value)}
+                >
                   <option value="none">None</option>
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -722,7 +807,7 @@ const ControlPanel = () => {
           {automations.map((auto) => (
             <div key={auto.id} className={styles.automationItemRow}>
               <div>
-                <strong>{auto.name}</strong> ({auto.type}) – {auto.enabled ? "Enabled" : "Disabled"}
+                <strong>{computeAutomationLabel(auto)}</strong>
               </div>
               <div>
                 <button onClick={() => handleToggleEnabled(auto.id, auto.enabled)} className={`${styles.setButton} ${styles.automationToggleButton}`}>
