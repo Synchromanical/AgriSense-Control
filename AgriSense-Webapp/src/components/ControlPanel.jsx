@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext } from "react";
 import {
   collection,
   query,
+  where,
   orderBy,
   limit,
   onSnapshot,
@@ -61,10 +62,15 @@ const ControlPanel = () => {
     action: "turnFanOn",
   });
 
+  // Subscribe to the latest sensor reading for the selected node (using nodeNumber as a number)
   useEffect(() => {
     const sensorCollection = collection(db, "sensorData");
-    const q = query(sensorCollection, orderBy("timestamp", "desc"), limit(1));
-
+    const q = query(
+      sensorCollection,
+      where("nodeNumber", "==", Number(selectedInstance)),
+      orderBy("timestamp", "desc"),
+      limit(1)
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const docSnap = snapshot.docs[0];
@@ -91,7 +97,7 @@ const ControlPanel = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [selectedInstance]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
@@ -104,6 +110,7 @@ const ControlPanel = () => {
     return () => unsub();
   }, []);
 
+  // Create a new sensor reading including the selected node number (as a number)
   async function createNewReading(updatedFields) {
     const mergedData = {
       temperature:
@@ -124,6 +131,7 @@ const ControlPanel = () => {
           ? updatedFields.fanState
           : latestData.fanState,
       timestamp: getTimestampString(),
+      nodeNumber: Number(selectedInstance), // Write nodeNumber as a number
     };
 
     try {
@@ -333,9 +341,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>°C</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.temperature} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, temperature: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.temperature}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, temperature: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>°C</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -355,9 +369,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.humidity} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, humidity: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.humidity}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, humidity: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -377,9 +397,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.soilMoisture} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, soilMoisture: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.soilMoisture}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, soilMoisture: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -399,9 +425,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>lux</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.light} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, light: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.light}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, light: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>lux</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -417,15 +449,27 @@ const ControlPanel = () => {
                 </div>
                 <div className={styles.rowEdited}>
                   <label className={styles.automationRadioLabel}>
-                    <input type="radio" name="lightState" value="true" checked={editedData.lightState === true} onChange={() =>
-                      setEditedData((prev) => ({ ...prev, lightState: true }))
-                    } />
+                    <input
+                      type="radio"
+                      name="lightState"
+                      value="true"
+                      checked={editedData.lightState === true}
+                      onChange={() =>
+                        setEditedData((prev) => ({ ...prev, lightState: true }))
+                      }
+                    />
                     On
                   </label>
                   <label className={styles.automationRadioLabel}>
-                    <input type="radio" name="lightState" value="false" checked={editedData.lightState === false} onChange={() =>
-                      setEditedData((prev) => ({ ...prev, lightState: false }))
-                    } />
+                    <input
+                      type="radio"
+                      name="lightState"
+                      value="false"
+                      checked={editedData.lightState === false}
+                      onChange={() =>
+                        setEditedData((prev) => ({ ...prev, lightState: false }))
+                      }
+                    />
                     Off
                   </label>
                 </div>
@@ -452,7 +496,6 @@ const ControlPanel = () => {
                 </div>
               </>
             )}
-            {/* The Fan row is omitted because no corresponding sensor exists */}
           </div>
         )}
       </div>

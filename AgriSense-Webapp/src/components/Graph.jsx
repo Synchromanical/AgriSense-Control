@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from "react";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
@@ -12,8 +12,13 @@ const Graph = () => {
   const [sensorData, setSensorData] = useState([]);
   const [selectedField, setSelectedField] = useState("all");
 
+  // Only get sensorData for the selected node (using nodeNumber as a number)
   useEffect(() => {
-    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
+    const q = query(
+      collection(db, "sensorData"),
+      where("nodeNumber", "==", Number(selectedInstance)),
+      orderBy("timestamp", "asc")
+    );
     const unsub = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((doc) => {
         const data = doc.data();
@@ -29,7 +34,7 @@ const Graph = () => {
       setSensorData(docs);
     });
     return () => unsub();
-  }, []);
+  }, [selectedInstance]);
 
   const timestamps = [];
   const humidityData = [];
