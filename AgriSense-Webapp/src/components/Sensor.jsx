@@ -5,6 +5,8 @@ import styles from "../Sensor.module.css";
 const Sensor = () => {
   const { activeSensors, addSensor, removeSensor, clearSensors, selectedInstance } = useContext(SensorContext);
   const [selectedSensor, setSelectedSensor] = useState("");
+  // Added state for board type with default as GSMB
+  const [boardType, setBoardType] = useState("GSMB");
   // Local state to let the user choose which node the sensor is saved to
   const [selectedNode, setSelectedNode] = useState(selectedInstance);
 
@@ -12,6 +14,13 @@ const Sensor = () => {
   useEffect(() => {
     setSelectedNode(selectedInstance);
   }, [selectedInstance]);
+
+  // Mapping of board types to available sensor options
+  const sensorOptionsByBoardType = {
+    GSMB: ["Temperature", "Humidity", "Soil Moisture"],
+    HPCB: ["Light", "Fan"],
+    NSCB: ["Water Level"],
+  };
 
   const handleSaveInstance = () => {
     if (!selectedSensor) return;
@@ -35,7 +44,28 @@ const Sensor = () => {
       <div className={styles.sensorGrid}>
         <h3 className={styles.instanceConfigTitle}>Instance Configuration</h3>
 
-        {/* Sensor selection */}
+        {/* New Board Type row */}
+        <div className={styles.formRow}>
+          <div className={styles.leftColumn}>
+            <label className={styles.sensorLabel}>Board Type:</label>
+          </div>
+          <div className={styles.rightColumn}>
+            <select
+              value={boardType}
+              onChange={(e) => {
+                setBoardType(e.target.value);
+                setSelectedSensor(""); // reset sensor selection when board type changes
+              }}
+              className={styles.sensorDropdown}
+            >
+              <option value="GSMB">GSMB</option>
+              <option value="HPCB">HPCB</option>
+              <option value="NSCB">NSCB</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Sensor selection row */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Sensor:</label>
@@ -47,16 +77,16 @@ const Sensor = () => {
               className={styles.sensorDropdown}
             >
               <option value="">-- Select a Sensor --</option>
-              <option value="Temperature">Temperature</option>
-              <option value="Humidity">Humidity</option>
-              <option value="Soil Moisture">Soil Moisture</option>
-              <option value="Water Level">Water Level</option>
-              <option value="Light">Light</option>
+              {sensorOptionsByBoardType[boardType].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
-        {/* Node selection */}
+        {/* Node selection row */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Node:</label>

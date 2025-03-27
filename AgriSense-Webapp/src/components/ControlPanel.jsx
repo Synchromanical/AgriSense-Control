@@ -8,7 +8,7 @@ import {
   addDoc,
   doc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import styles from "../ControlPanel.module.css";
@@ -25,6 +25,20 @@ function getTimestampString(date = new Date()) {
   const [withoutMillis] = iso.split(".");
   return withoutMillis + "Z";
 }
+
+/*
+  Mapping from sensor (normalized to lowercase with no spaces) to its associated collection and field.
+  Note: "fan" is written to the "fanState" field.
+*/
+const sensorMapping = {
+  temperature: { collection: "GSMB", field: "temperature" },
+  humidity: { collection: "GSMB", field: "humidity" },
+  soilmoisture: { collection: "GSMB", field: "soilMoisture" },
+  light: { collection: "HPCB", field: "light" },
+  lightstate: { collection: "HPCB", field: "lightState" },
+  fanstate: { collection: "HPCB", field: "fanState" },
+  waterlevel: { collection: "NSCB", field: "waterLevel" },
+};
 
 const ControlPanel = () => {
   const { activeSensors, selectedInstance } = useContext(SensorContext);
@@ -47,6 +61,7 @@ const ControlPanel = () => {
     lightState: false,
     fanState: false,
   });
+  // Automations state remains unchanged…
   const [automations, setAutomations] = useState([]);
   const [selectedAutomationId, setSelectedAutomationId] = useState("");
   const [automationForm, setAutomationForm] = useState({
@@ -61,75 +76,126 @@ const ControlPanel = () => {
     action: "turnFanOn",
   });
 
+  // Listen for sensor updates from appropriate collections based on active sensors.
   useEffect(() => {
-    const sensorCollection = collection(db, "sensorData");
-    const q = query(sensorCollection, orderBy("timestamp", "desc"), limit(1));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const docSnap = snapshot.docs[0];
-        const data = docSnap.data();
-        setLatestData({
-          temperature: formatOneDecimal(data.temperature),
-          humidity: formatOneDecimal(data.humidity),
-          soilMoisture: formatOneDecimal(data.soilMoisture),
-          light: formatOneDecimal(data.light),
-          waterLevel: data.waterLevel ?? "",
-          lightState: data.lightState ?? false,
-          fanState: data.fanState ?? false,
-          timestamp: data.timestamp,
-        });
-        setEditedData({
-          temperature: formatOneDecimal(data.temperature),
-          humidity: formatOneDecimal(data.humidity),
-          soilMoisture: formatOneDecimal(data.soilMoisture),
-          light: formatOneDecimal(data.light),
-          lightState: data.lightState ?? false,
-          fanState: data.fanState ?? false,
-        });
+    const collectionsNeeded = {};
+    sensors.forEach((sensorName) => {
+      const key = sensorName.toLowerCase().replace(/\s/g, "");
+      if (sensorMapping[key]) {
+        const colName = sensorMapping[key].collection;
+        if (!collectionsNeeded[colName]) {
+          collectionsNeeded[colName] = new Set();
+        }
+        collectionsNeeded[colName].add(sensorMapping[key].field);
+        // For "Light", also listen for "lightState"
+        if (key === "light") {
+          collectionsNeeded[colName].add("lightState");
+        }
       }
     });
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
-      const fetched = [];
-      snapshot.forEach((doc) => {
-        fetched.push({ id: doc.id, ...doc.data() });
+    const unsubscribes = [];
+    Object.entries(collectionsNeeded).forEach(([colName, fieldsSet]) => {
+      const colRef = collection(db, colName);
+      const q = query(colRef, orderBy("timestamp", "desc"), limit(1));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+          const docSnap = snapshot.docs[0];
+          const data = docSnap.data();
+          setLatestData((prev) => {
+            const newData = { ...prev };
+            fieldsSet.forEach((field) => {
+              if (data[field] !== undefined) {
+                newData[field] =
+                  typeof data[field] === "boolean"
+                    ? data[field]
+                    : formatOneDecimal(data[field]);
+              }
+            });
+            newData.timestamp = data.timestamp;
+            return newData;
+          });
+          setEditedData((prev) => {
+            const newData = { ...prev };
+            fieldsSet.forEach((field) => {
+              if (data[field] !== undefined) {
+                newData[field] =
+                  typeof data[field] === "boolean"
+                    ? data[field]
+                    : formatOneDecimal(data[field]);
+              }
+            });
+            return newData;
+          });
+        }
       });
-      setAutomations(fetched);
+      unsubscribes.push(unsubscribe);
     });
-    return () => unsub();
-  }, []);
+    return () => unsubscribes.forEach((u) => u());
+  }, [sensors]);
 
+  /*
+    Updated write function:
+    – For each active board (based on sensors), create a full document that always includes all required fields.
+    For GSMB: temperature, humidity, soilMoisture, boardType ("GSMB"), timestamp.
+    For HPCB: light, lightState, fanState, boardType ("HPCB"), timestamp.
+    For NSCB: waterLevel, boardType ("NSCB"), timestamp.
+    Values are taken from updatedFields if provided; otherwise fallback to latestData or default.
+  */
   async function createNewReading(updatedFields) {
-    const mergedData = {
-      temperature:
-        parseFloat(updatedFields.temperature ?? latestData.temperature) || 0,
-      humidity:
-        parseFloat(updatedFields.humidity ?? latestData.humidity) || 0,
-      soilMoisture:
-        parseFloat(updatedFields.soilMoisture ?? latestData.soilMoisture) || 0,
-      light: parseFloat(updatedFields.light ?? latestData.light) || 0,
-      waterLevel:
-        parseFloat(updatedFields.waterLevel ?? latestData.waterLevel) || 0,
-      lightState:
-        typeof updatedFields.lightState === "boolean"
-          ? updatedFields.lightState
-          : latestData.lightState,
-      fanState:
-        typeof updatedFields.fanState === "boolean"
-          ? updatedFields.fanState
-          : latestData.fanState,
-      timestamp: getTimestampString(),
-    };
-
-    try {
-      await addDoc(collection(db, "sensorData"), mergedData);
-    } catch (error) {
-      console.error("Error creating new reading doc:", error);
+    // Determine active boards based on active sensors.
+    const activeBoards = new Set();
+    sensors.forEach((sensorName) => {
+      const key = sensorName.toLowerCase().replace(/\s/g, "");
+      if (sensorMapping[key]) {
+        activeBoards.add(sensorMapping[key].collection);
+      }
+    });
+    const timestamp = getTimestampString();
+    // Build a full document for each board.
+    for (const board of activeBoards) {
+      let docData = { boardType: board, timestamp };
+      if (board === "GSMB") {
+        docData.temperature =
+          updatedFields.temperature !== undefined
+            ? updatedFields.temperature
+            : latestData.temperature !== "" ? latestData.temperature : 0;
+        docData.humidity =
+          updatedFields.humidity !== undefined
+            ? updatedFields.humidity
+            : latestData.humidity !== "" ? latestData.humidity : 0;
+        docData.soilMoisture =
+          updatedFields.soilMoisture !== undefined
+            ? updatedFields.soilMoisture
+            : latestData.soilMoisture !== "" ? latestData.soilMoisture : 0;
+        docData.temperature = parseFloat(docData.temperature) || 0;
+        docData.humidity = parseFloat(docData.humidity) || 0;
+        docData.soilMoisture = parseFloat(docData.soilMoisture) || 0;
+      } else if (board === "HPCB") {
+        docData.light =
+          updatedFields.light !== undefined
+            ? updatedFields.light
+            : latestData.light !== "" ? latestData.light : 0;
+        docData.lightState =
+          updatedFields.lightState !== undefined
+            ? updatedFields.lightState
+            : typeof latestData.lightState === "boolean" ? latestData.lightState : false;
+        docData.fanState =
+          updatedFields.fanState !== undefined
+            ? updatedFields.fanState
+            : typeof latestData.fanState === "boolean" ? latestData.fanState : false;
+        docData.light = parseFloat(docData.light) || 0;
+      } else if (board === "NSCB") {
+        docData.waterLevel =
+          updatedFields.waterLevel !== undefined
+            ? updatedFields.waterLevel
+            : latestData.waterLevel !== "" ? latestData.waterLevel : 0;
+        docData.waterLevel = parseFloat(docData.waterLevel) || 0;
+      }
+      try {
+        await addDoc(collection(db, board), docData);
+      } catch (error) {
+        console.error(`Error creating new reading in ${board}:`, error);
+      }
     }
   }
 
@@ -147,7 +213,6 @@ const ControlPanel = () => {
     ];
     const isNumberKey =
       (e.key >= "0" && e.key <= "9") || (e.keyCode >= 96 && e.keyCode <= 105);
-
     if (!allowedKeys.includes(e.key) && !isNumberKey) {
       e.preventDefault();
     }
@@ -159,20 +224,22 @@ const ControlPanel = () => {
   };
 
   const handleSetAllSensors = async () => {
-    await createNewReading({
-      temperature: editedData.temperature,
-      humidity: editedData.humidity,
-      soilMoisture: editedData.soilMoisture,
-      light: editedData.light,
-      lightState: editedData.lightState,
-      fanState: editedData.fanState,
-    });
+    const updateObj = {};
+    if (editedData.temperature !== "") updateObj.temperature = editedData.temperature;
+    if (editedData.humidity !== "") updateObj.humidity = editedData.humidity;
+    if (editedData.soilMoisture !== "") updateObj.soilMoisture = editedData.soilMoisture;
+    if (editedData.light !== "") updateObj.light = editedData.light;
+    updateObj.lightState = editedData.lightState;
+    updateObj.fanState = editedData.fanState;
+    if (editedData.waterLevel !== undefined) updateObj.waterLevel = editedData.waterLevel;
+    await createNewReading(updateObj);
   };
 
   const handleFillWater = async () => {
     await createNewReading({ waterLevel: 100 });
   };
 
+  // Automation handlers remain unchanged…
   const handleAutomationFormChange = (field, value) => {
     setAutomationForm((prev) => ({
       ...prev,
@@ -209,7 +276,6 @@ const ControlPanel = () => {
   const handleSelectAutomation = (e) => {
     const id = e.target.value;
     setSelectedAutomationId(id);
-
     if (!id) {
       setAutomationForm({
         name: "",
@@ -224,7 +290,6 @@ const ControlPanel = () => {
       });
       return;
     }
-
     const found = automations.find((a) => a.id === id);
     if (found) {
       setAutomationForm({
@@ -333,9 +398,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>°C</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.temperature} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, temperature: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.temperature}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, temperature: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>°C</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -355,9 +426,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.humidity} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, humidity: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.humidity}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, humidity: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -377,9 +454,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.soilMoisture} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, soilMoisture: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.soilMoisture}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, soilMoisture: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>%</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -399,9 +482,15 @@ const ControlPanel = () => {
                   <span className={styles.unit}>lux</span>
                 </div>
                 <div className={styles.rowEdited}>
-                  <input type="number" value={editedData.light} onChange={(e) =>
-                    setEditedData((prev) => ({ ...prev, light: e.target.value }))
-                  } onKeyDown={handleKeyDown} className={styles.sensorInput} />
+                  <input
+                    type="number"
+                    value={editedData.light}
+                    onChange={(e) =>
+                      setEditedData((prev) => ({ ...prev, light: e.target.value }))
+                    }
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
                   <span className={styles.unit}>lux</span>
                 </div>
                 <div className={styles.rowSet}>
@@ -415,17 +504,29 @@ const ControlPanel = () => {
                 <div className={styles.rowLatest}>
                   <input type="text" value={latestData.lightState ? "On" : "Off"} readOnly className={styles.sensorInput} />
                 </div>
-                <div className={styles.rowEdited}>
+                <div className={styles.rowButton}>
                   <label className={styles.automationRadioLabel}>
-                    <input type="radio" name="lightState" value="true" checked={editedData.lightState === true} onChange={() =>
-                      setEditedData((prev) => ({ ...prev, lightState: true }))
-                    } />
+                    <input
+                      type="radio"
+                      name="lightState"
+                      value="true"
+                      checked={editedData.lightState === true}
+                      onChange={() =>
+                        setEditedData((prev) => ({ ...prev, lightState: true }))
+                      }
+                    />
                     On
                   </label>
                   <label className={styles.automationRadioLabel}>
-                    <input type="radio" name="lightState" value="false" checked={editedData.lightState === false} onChange={() =>
-                      setEditedData((prev) => ({ ...prev, lightState: false }))
-                    } />
+                    <input
+                      type="radio"
+                      name="lightState"
+                      value="false"
+                      checked={editedData.lightState === false}
+                      onChange={() =>
+                        setEditedData((prev) => ({ ...prev, lightState: false }))
+                      }
+                    />
                     Off
                   </label>
                 </div>
@@ -437,22 +538,78 @@ const ControlPanel = () => {
               </>
             )}
             {sensors.includes("Water Level") && (
-              <>
-                <div className={styles.rowLabel}>
-                  <strong>Water Level:</strong>
-                </div>
-                <div className={styles.rowLatest}>
-                  <input type="number" value={latestData.waterLevel} readOnly className={styles.sensorInput} />
-                  <span className={styles.unit}>%</span>
-                </div>
-                <div className={styles.rowEdited}>
-                  <button onClick={handleFillWater} className={styles.setButton}>
-                    Fill Water
-                  </button>
-                </div>
-              </>
-            )}
-            {/* The Fan row is omitted because no corresponding sensor exists */}
+            <>
+              <div className={styles.rowLabel}>
+                <strong>Water Level:</strong>
+              </div>
+              <div className={styles.rowLatest}>
+                <input
+                  type="number"
+                  value={latestData.waterLevel}
+                  readOnly
+                  className={styles.sensorInput}
+                />
+                <span className={styles.unit}>%</span>
+              </div>
+              <div className={styles.rowButton}>
+                <button onClick={handleFillWater} className={styles.setButton}>
+                  Fill Water
+                </button>
+              </div>
+              {/* Empty cell for the Set column */}
+              <div className={styles.rowSet}></div>
+            </>
+          )}
+
+           {sensors.includes("Fan") && (
+            <>
+              <div className={styles.rowLabel}>
+                <strong>Fan State:</strong>
+              </div>
+              <div className={styles.rowLatest}>
+                <input
+                  type="text"
+                  value={latestData.fanState ? "On" : "Off"}
+                  readOnly
+                  className={styles.sensorInput}
+                />
+              </div>
+              <div className={styles.rowButton}>
+                <label className={styles.automationRadioLabel}>
+                  <input
+                    type="radio"
+                    name="fanState"
+                    value="true"
+                    checked={editedData.fanState === true}
+                    onChange={() =>
+                      setEditedData((prev) => ({ ...prev, fanState: true }))
+                    }
+                  />
+                  On
+                </label>
+                <label className={styles.automationRadioLabel}>
+                  <input
+                    type="radio"
+                    name="fanState"
+                    value="false"
+                    checked={editedData.fanState === false}
+                    onChange={() =>
+                      setEditedData((prev) => ({ ...prev, fanState: false }))
+                    }
+                  />
+                  Off
+                </label>
+              </div>
+              <div className={styles.rowSet}>
+                <button
+                  onClick={() => handleSetSensor("fanState")}
+                  className={styles.setButton}
+                >
+                  Set
+                </button>
+              </div>
+            </>
+          )}
           </div>
         )}
       </div>

@@ -18,10 +18,20 @@ function getTimestampString(date = new Date()) {
   return withoutMillis + "Z";
 }
 
+const sensorMapping = {
+  temperature: { collection: "GSMB", field: "temperature" },
+  humidity: { collection: "GSMB", field: "humidity" },
+  soilmoisture: { collection: "GSMB", field: "soilMoisture" },
+  light: { collection: "HPCB", field: "light" },
+  lightstate: { collection: "HPCB", field: "lightState" },
+  fanstate: { collection: "HPCB", field: "fanState" },
+  waterlevel: { collection: "NSCB", field: "waterLevel" },
+};
+
 const Logs = () => {
   const { activeSensors, selectedInstance } = useContext(SensorContext);
   const sensors = activeSensors[selectedInstance] || [];
-  const [logs, setLogs] = useState([]);
+  const [mergedLogs, setMergedLogs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -29,47 +39,65 @@ const Logs = () => {
   const fileInputRef = useRef(null);
   const logsPerPage = 25;
 
+  // Existing code to merge logs from active boards remains unchanged…
   useEffect(() => {
-    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const newLogs = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        let timeObj;
-        if (data.timestamp && typeof data.timestamp === "string") {
-          timeObj = new Date(data.timestamp);
-        } else {
-          timeObj = new Date(0);
-        }
-        const timeDisplay = timeObj.toLocaleString();
-        const sensorFields = [
-          { label: "Temperature", value: data.temperature },
-          { label: "Humidity", value: data.humidity },
-          { label: "Soil Moisture", value: data.soilMoisture },
-          { label: "Light", value: data.light },
-          { label: "Water Level", value: data.waterLevel },
-          { label: "Light State", value: data.lightState },
-          { label: "Fan State", value: data.fanState },
-        ];
-        sensorFields.forEach((field) => {
-          if (field.value !== undefined && field.value !== null) {
-            newLogs.push({
-              time: timeObj,
-              timeDisplay,
-              action: `Reading of ${field.label}: ${field.value}`,
-            });
-          }
-        });
-      });
-      newLogs.forEach((log, idx) => {
-        log.id = idx + 1;
-      });
-      setLogs(newLogs);
+    const collectionsNeeded = {};
+    sensors.forEach((sensor) => {
+      const key = sensor.toLowerCase().replace(/\s/g, "");
+      if (sensorMapping[key]) {
+        collectionsNeeded[sensorMapping[key].collection] = true;
+      }
     });
-    return () => unsub();
-  }, []);
+    const unsubscribes = [];
+    const logsByCollection = {};
+    Object.keys(collectionsNeeded).forEach((colName) => {
+      logsByCollection[colName] = [];
+      const q = query(collection(db, colName), orderBy("timestamp", "asc"));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        logsByCollection[colName] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          let timeObj = new Date(0);
+          if (data.timestamp && typeof data.timestamp === "string") {
+            const parsed = new Date(data.timestamp);
+            if (!isNaN(parsed.getTime())) {
+              timeObj = parsed;
+            }
+          }
+          const timeDisplay = timeObj.toLocaleString();
+          const sensorFields = [
+            { label: "Temperature", value: data.temperature },
+            { label: "Humidity", value: data.humidity },
+            { label: "Soil Moisture", value: data.soilMoisture },
+            { label: "Light", value: data.light },
+            { label: "Water Level", value: data.waterLevel },
+            { label: "Light State", value: data.lightState },
+            { label: "Fan State", value: data.fanState },
+          ];
+          const logs = [];
+          sensorFields.forEach((field) => {
+            if (field.value !== undefined && field.value !== null) {
+              logs.push({
+                time: timeObj,
+                timeDisplay,
+                action: `Reading of ${field.label}: ${field.value}`,
+              });
+            }
+          });
+          return logs;
+        }).flat();
+        const merged = Object.values(logsByCollection).flat();
+        merged.sort((a, b) => a.time - b.time);
+        merged.forEach((log, idx) => {
+          log.id = idx + 1;
+        });
+        setMergedLogs(merged);
+      });
+      unsubscribes.push(unsubscribe);
+    });
+    return () => unsubscribes.forEach((u) => u());
+  }, [sensors]);
 
-  const filteredLogs = logs.filter((log) => {
+  const filteredLogs = mergedLogs.filter((log) => {
     const textMatch =
       searchTerm === "" ||
       log.id.toString().includes(searchTerm) ||
@@ -124,8 +152,53 @@ const Logs = () => {
     return pages;
   };
 
+  /*
+    UPDATED import: For each imported log item, create a full document in each board’s collection.
+    For GSMB: Temperature, Humidity, Soil Moisture, boardType "GSMB", timestamp.
+    For HPCB: Light, Light State, Fan State, boardType "HPCB", timestamp.
+    For NSCB: Water Level, boardType "NSCB", timestamp.
+  */
+  const handleImportLogs = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const imported = JSON.parse(event.target.result);
+        for (const item of imported) {
+          const stringTime = item.time ? item.time : getTimestampString();
+          // Create a document for GSMB with all required fields:
+          await addDoc(collection(db, "GSMB"), {
+            temperature: 0,
+            humidity: 0,
+            soilMoisture: 0,
+            boardType: "GSMB",
+            timestamp: stringTime,
+          });
+          // Create a document for HPCB with all required fields:
+          await addDoc(collection(db, "HPCB"), {
+            light: 0,
+            lightState: false,
+            fanState: false,
+            boardType: "HPCB",
+            timestamp: stringTime,
+          });
+          // Create a document for NSCB with all required fields:
+          await addDoc(collection(db, "NSCB"), {
+            waterLevel: 0,
+            boardType: "NSCB",
+            timestamp: stringTime,
+          });
+        }
+      } catch (error) {
+        console.error("Error parsing imported file", error);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleExportLogs = () => {
-    const exportData = logs.map((log) => ({
+    const exportData = mergedLogs.map((log) => ({
       id: log.id,
       time: log.time?.toISOString() || null,
       action: log.action,
@@ -142,40 +215,22 @@ const Logs = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportLogs = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const imported = JSON.parse(event.target.result);
-        for (const item of imported) {
-          const stringTime = item.time ? item.time : getTimestampString();
-          await addDoc(collection(db, "sensorData"), {
-            temperature: 0,
-            humidity: 0,
-            soilMoisture: 0,
-            light: 0,
-            waterLevel: 0,
-            lightState: false,
-            fanState: false,
-            timestamp: stringTime,
-          });
-        }
-      } catch (error) {
-        console.error("Error parsing imported file", error);
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const handleClearLogs = async () => {
     try {
-      const snap = await import("firebase/firestore").then(({ getDocs }) =>
-        getDocs(collection(db, "sensorData"))
-      );
-      for (const logDoc of snap.docs) {
-        await deleteDoc(doc(db, "sensorData", logDoc.id));
+      const collectionsToClear = {};
+      sensors.forEach((sensor) => {
+        const key = sensor.toLowerCase().replace(/\s/g, "");
+        if (sensorMapping[key]) {
+          collectionsToClear[sensorMapping[key].collection] = true;
+        }
+      });
+      for (const colName of Object.keys(collectionsToClear)) {
+        const snap = await import("firebase/firestore").then(({ getDocs }) =>
+          getDocs(collection(db, colName))
+        );
+        for (const logDoc of snap.docs) {
+          await deleteDoc(doc(db, colName, logDoc.id));
+        }
       }
     } catch (error) {
       console.error("Error clearing logs:", error);
