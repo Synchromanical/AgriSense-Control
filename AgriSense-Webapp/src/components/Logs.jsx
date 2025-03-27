@@ -20,8 +20,7 @@ function getTimestampString(date = new Date()) {
 }
 
 const Logs = () => {
-  const { activeSensors, selectedInstance } = useContext(SensorContext);
-  const sensors = activeSensors[selectedInstance] || [];
+  const { activeSensors } = useContext(SensorContext);
   const [logs, setLogs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,6 +74,8 @@ const Logs = () => {
     return () => unsub();
   }, [selectedInstance]);
 
+  // Only show logs if at least one sensor is selected.
+  // Filter logs to only those whose action text contains an active sensor name.
   const filteredLogs = logs.filter((log) => {
     const textMatch =
       searchTerm === "" ||
@@ -89,9 +90,10 @@ const Logs = () => {
       const endDate = new Date(endTime);
       timeMatch = timeMatch && log.time <= endDate;
     }
+    // Change here: require at least one active sensor and only include logs for those sensors.
     const sensorMatch =
-      sensors.length > 0 &&
-      sensors.some((sensor) =>
+      activeSensors.length > 0 &&
+      activeSensors.some((sensor) =>
         log.action.toLowerCase().includes(sensor.toLowerCase())
       );
     return textMatch && timeMatch && sensorMatch;
@@ -99,7 +101,7 @@ const Logs = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, startTime, endTime, sensors]);
+  }, [searchTerm, startTime, endTime, activeSensors]);
 
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
@@ -192,7 +194,7 @@ const Logs = () => {
   return (
     <div className={styles.content}>
       <h2>All Logs</h2>
-      {sensors.length === 0 ? (
+      {activeSensors.length === 0 ? (
         <p>Please select a sensor in the Sensor tab to view logs.</p>
       ) : (
         <>

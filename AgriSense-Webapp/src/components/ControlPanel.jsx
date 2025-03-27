@@ -28,8 +28,7 @@ function getTimestampString(date = new Date()) {
 }
 
 const ControlPanel = () => {
-  const { activeSensors, selectedInstance } = useContext(SensorContext);
-  const sensors = activeSensors[selectedInstance] || [];
+  const { activeSensors } = useContext(SensorContext);
   const [latestData, setLatestData] = useState({
     temperature: "",
     humidity: "",
@@ -327,11 +326,11 @@ const ControlPanel = () => {
       <h2>Control Panel</h2>
       <div className={styles.controlPanelContainer}>
         <h3>Sensor Control</h3>
-        {sensors.length === 0 ? (
+        {activeSensors.length === 0 ? (
           <p>Please select a sensor in the Sensor tab to control.</p>
         ) : (
           <div className={styles.controlPanelGrid}>
-            {sensors.includes("Temperature") && (
+            {activeSensors.includes("Temperature") && (
               <>
                 <div className={styles.rowLabel}>
                   <strong>Temperature:</strong>
@@ -359,7 +358,7 @@ const ControlPanel = () => {
                 </div>
               </>
             )}
-            {sensors.includes("Humidity") && (
+            {activeSensors.includes("Humidity") && (
               <>
                 <div className={styles.rowLabel}>
                   <strong>Humidity:</strong>
@@ -387,7 +386,7 @@ const ControlPanel = () => {
                 </div>
               </>
             )}
-            {sensors.includes("Soil Moisture") && (
+            {activeSensors.includes("Soil Moisture") && (
               <>
                 <div className={styles.rowLabel}>
                   <strong>Soil Moisture:</strong>
@@ -415,7 +414,7 @@ const ControlPanel = () => {
                 </div>
               </>
             )}
-            {sensors.includes("Light") && (
+            {activeSensors.includes("Light") && (
               <>
                 <div className={styles.rowLabel}>
                   <strong>Light:</strong>
@@ -480,7 +479,7 @@ const ControlPanel = () => {
                 </div>
               </>
             )}
-            {sensors.includes("Water Level") && (
+            {activeSensors.includes("Water Level") && (
               <>
                 <div className={styles.rowLabel}>
                   <strong>Water Level:</strong>
