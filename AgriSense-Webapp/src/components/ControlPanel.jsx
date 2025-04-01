@@ -28,38 +28,49 @@ function getTimestampString(date = new Date()) {
 
 /*
   Mapping from sensor (normalized to lowercase with no spaces) to its associated collection and field.
-  Note: "fan" is written to the "fanState" field.
+  (You may need to extend this mapping if you want to fully support individual fan/light fields.)
 */
 const sensorMapping = {
   temperature: { collection: "GSMB", field: "temperature" },
   humidity: { collection: "GSMB", field: "humidity" },
   soilmoisture: { collection: "GSMB", field: "soilMoisture" },
-  light: { collection: "HPCB", field: "light" },
-  lightstate: { collection: "HPCB", field: "lightState" },
-  fanstate: { collection: "HPCB", field: "fanState" },
   waterlevel: { collection: "NSCB", field: "waterLevel" },
 };
 
 const ControlPanel = () => {
   const { activeSensors, selectedInstance } = useContext(SensorContext);
   const sensors = activeSensors[selectedInstance] || [];
+  
+  // Added keys for individual HPCB sensors
   const [latestData, setLatestData] = useState({
     temperature: "",
     humidity: "",
     soilMoisture: "",
-    light: "",
+    light1: "",
+    light2: "",
+    light3: "",
+    light1State: false,
+    light2State: false,
+    light3State: false,
+    fan1State: false,
+    fan2State: false,
+    fan3State: false,
     waterLevel: "",
-    lightState: false,
-    fanState: false,
     timestamp: null,
   });
   const [editedData, setEditedData] = useState({
     temperature: "",
     humidity: "",
     soilMoisture: "",
-    light: "",
-    lightState: false,
-    fanState: false,
+    light1: "",
+    light2: "",
+    light3: "",
+    light1State: false,
+    light2State: false,
+    light3State: false,
+    fan1State: false,
+    fan2State: false,
+    fan3State: false,
   });
   const [automations, setAutomations] = useState([]);
   const [selectedAutomationId, setSelectedAutomationId] = useState("");
@@ -67,22 +78,20 @@ const ControlPanel = () => {
   // Board type for automations – "NSCB" or "HPCB"
   const [automationBoardType, setAutomationBoardType] = useState("NSCB");
 
-  // The automationForm holds user inputs.
-  // Saved fields include: name, type, enabled, and then type-specific settings.
+  // Automation form state
   const [automationForm, setAutomationForm] = useState({
     name: "",
-    type: "time-based", // Options: "time-based", "threshold-based", "time-length-based"
+    type: "time-based",
     enabled: true,
     dateTime: "",
     sensorField: "temperature",
     operator: ">",
     thresholdValue: "",
-    action: "addWater", // default for NSCB
+    action: automationBoardType === "NSCB" ? "addWater" : "turnFanOn",
     timeLength: "",
     timeUnit: "Second",
   });
 
-  // Subscribe to automations so that saved automations appear in the UI.
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "automations"), (snapshot) => {
       const docs = snapshot.docs.map((doc) => ({
@@ -94,10 +103,11 @@ const ControlPanel = () => {
     return () => unsubscribe();
   }, []);
 
-  // Listen for sensor updates from the needed collections.
+  // Subscribe to sensor updates (for simplicity, this example adds extra field names when an HPCB sensor is active)
   useEffect(() => {
     const collectionsNeeded = {};
     sensors.forEach((sensorName) => {
+      // Use sensorMapping for GSMB and NSCB sensors
       const key = sensorName.toLowerCase().replace(/\s/g, "");
       if (sensorMapping[key]) {
         const colName = sensorMapping[key].collection;
@@ -105,9 +115,18 @@ const ControlPanel = () => {
           collectionsNeeded[colName] = new Set();
         }
         collectionsNeeded[colName].add(sensorMapping[key].field);
-        if (key === "light") {
-          collectionsNeeded[colName].add("lightState");
-        }
+      }
+      // For HPCB sensors, add fields for individual sensors
+      if (sensorName.startsWith("Light")) {
+        const [ , number] = sensorName.split(" ");
+        collectionsNeeded["HPCB"] = collectionsNeeded["HPCB"] || new Set();
+        collectionsNeeded["HPCB"].add(`light${number}`);
+        collectionsNeeded["HPCB"].add(`light${number}State`);
+      }
+      if (sensorName.startsWith("Fan")) {
+        const [ , number] = sensorName.split(" ");
+        collectionsNeeded["HPCB"] = collectionsNeeded["HPCB"] || new Set();
+        collectionsNeeded["HPCB"].add(`fan${number}State`);
       }
     });
     const unsubscribes = [];
@@ -157,6 +176,9 @@ const ControlPanel = () => {
       if (sensorMapping[key]) {
         activeBoards.add(sensorMapping[key].collection);
       }
+      if (sensorName.startsWith("Light") || sensorName.startsWith("Fan")) {
+        activeBoards.add("HPCB");
+      }
     });
     const timestamp = getTimestampString();
     for (const board of activeBoards) {
@@ -178,19 +200,43 @@ const ControlPanel = () => {
         docData.humidity = parseFloat(docData.humidity) || 0;
         docData.soilMoisture = parseFloat(docData.soilMoisture) || 0;
       } else if (board === "HPCB") {
-        docData.light =
-          updatedFields.light !== undefined
-            ? updatedFields.light
-            : latestData.light !== "" ? latestData.light : 0;
-        docData.lightState =
-          updatedFields.lightState !== undefined
-            ? updatedFields.lightState
-            : typeof latestData.lightState === "boolean" ? latestData.lightState : false;
-        docData.fanState =
-          updatedFields.fanState !== undefined
-            ? updatedFields.fanState
-            : typeof latestData.fanState === "boolean" ? latestData.fanState : false;
-        docData.light = parseFloat(docData.light) || 0;
+        // Set individual HPCB sensor fields
+        docData.light1 =
+          updatedFields.light1 !== undefined
+            ? updatedFields.light1
+            : latestData.light1 !== "" ? latestData.light1 : 0;
+        docData.light2 =
+          updatedFields.light2 !== undefined
+            ? updatedFields.light2
+            : latestData.light2 !== "" ? latestData.light2 : 0;
+        docData.light3 =
+          updatedFields.light3 !== undefined
+            ? updatedFields.light3
+            : latestData.light3 !== "" ? latestData.light3 : 0;
+        docData.light1State =
+          updatedFields.light1State !== undefined
+            ? updatedFields.light1State
+            : typeof latestData.light1State === "boolean" ? latestData.light1State : false;
+        docData.light2State =
+          updatedFields.light2State !== undefined
+            ? updatedFields.light2State
+            : typeof latestData.light2State === "boolean" ? latestData.light2State : false;
+        docData.light3State =
+          updatedFields.light3State !== undefined
+            ? updatedFields.light3State
+            : typeof latestData.light3State === "boolean" ? latestData.light3State : false;
+        docData.fan1State =
+          updatedFields.fan1State !== undefined
+            ? updatedFields.fan1State
+            : typeof latestData.fan1State === "boolean" ? latestData.fan1State : false;
+        docData.fan2State =
+          updatedFields.fan2State !== undefined
+            ? updatedFields.fan2State
+            : typeof latestData.fan2State === "boolean" ? latestData.fan2State : false;
+        docData.fan3State =
+          updatedFields.fan3State !== undefined
+            ? updatedFields.fan3State
+            : typeof latestData.fan3State === "boolean" ? latestData.fan3State : false;
       } else if (board === "NSCB") {
         docData.waterLevel =
           updatedFields.waterLevel !== undefined
@@ -235,9 +281,15 @@ const ControlPanel = () => {
     if (editedData.temperature !== "") updateObj.temperature = editedData.temperature;
     if (editedData.humidity !== "") updateObj.humidity = editedData.humidity;
     if (editedData.soilMoisture !== "") updateObj.soilMoisture = editedData.soilMoisture;
-    if (editedData.light !== "") updateObj.light = editedData.light;
-    updateObj.lightState = editedData.lightState;
-    updateObj.fanState = editedData.fanState;
+    updateObj.light1 = editedData.light1;
+    updateObj.light2 = editedData.light2;
+    updateObj.light3 = editedData.light3;
+    updateObj.light1State = editedData.light1State;
+    updateObj.light2State = editedData.light2State;
+    updateObj.light3State = editedData.light3State;
+    updateObj.fan1State = editedData.fan1State;
+    updateObj.fan2State = editedData.fan2State;
+    updateObj.fan3State = editedData.fan3State;
     if (editedData.waterLevel !== undefined) updateObj.waterLevel = editedData.waterLevel;
     await createNewReading(updateObj);
   };
@@ -265,7 +317,6 @@ const ControlPanel = () => {
     }));
   };
 
-  // Reset the form to default values (enabled defaults to true).
   const resetAutomationForm = () => {
     setAutomationForm({
       name: "",
@@ -281,7 +332,6 @@ const ControlPanel = () => {
     });
   };
 
-  // When creating a new automation, build a payload including enabled.
   const handleCreateAutomation = async () => {
     try {
       let payload = {
@@ -312,7 +362,6 @@ const ControlPanel = () => {
     }
   };
 
-  // When selecting a saved automation, repopulate the form with its saved values.
   const handleSelectAutomation = (e) => {
     const id = e.target.value;
     setSelectedAutomationId(id);
@@ -339,7 +388,6 @@ const ControlPanel = () => {
     }
   };
 
-  // When updating an automation, include enabled in the payload.
   const handleUpdateAutomation = async () => {
     if (!selectedAutomationId) return;
     try {
@@ -407,7 +455,6 @@ const ControlPanel = () => {
     }
   };
 
-  // Compute dynamic action options based on board type.
   const actionOptions =
     automationBoardType === "NSCB"
       ? [
@@ -419,7 +466,6 @@ const ControlPanel = () => {
           { value: "turnLightOn", label: "Turn Light On" },
         ];
 
-  // Display automation label using its name and type.
   const computeAutomationLabel = (auto) => {
     return `${auto.name} (${auto.type})`;
   };
@@ -433,7 +479,6 @@ const ControlPanel = () => {
           <p>Please select a sensor in the Sensor tab to control.</p>
         ) : (
           <div className={styles.controlPanelGrid}>
-            {/* Sensor control rows (Temperature, Humidity, etc.) remain unchanged */}
             {sensors.includes("Temperature") && (
               <>
                 <div className={styles.rowLabel}>
@@ -512,60 +557,291 @@ const ControlPanel = () => {
                 </div>
               </>
             )}
-            {sensors.includes("Light") && (
+            {/* Fan Controls */}
+            {sensors.includes("Fan 1") && (
               <>
                 <div className={styles.rowLabel}>
-                  <strong>Light:</strong>
+                  <strong>Fan 1 State:</strong>
                 </div>
                 <div className={styles.rowLatest}>
-                  <input type="number" value={latestData.light} readOnly className={styles.sensorInput} />
-                  <span className={styles.unit}>lux</span>
-                </div>
-                <div className={styles.rowEdited}>
-                  <input
-                    type="number"
-                    value={editedData.light}
-                    onChange={(e) => setEditedData((prev) => ({ ...prev, light: e.target.value }))}
-                    onKeyDown={handleKeyDown}
-                    className={styles.sensorInput}
-                  />
-                  <span className={styles.unit}>lux</span>
-                </div>
-                <div className={styles.rowSet}>
-                  <button onClick={() => handleSetSensor("light")} className={styles.setButton}>
-                    Set
-                  </button>
-                </div>
-                <div className={styles.rowLabel}>
-                  <strong>Light State:</strong>
-                </div>
-                <div className={styles.rowLatest}>
-                  <input type="text" value={latestData.lightState ? "On" : "Off"} readOnly className={styles.sensorInput} />
+                  <input type="text" value={latestData.fan1State ? "On" : "Off"} readOnly className={styles.sensorInput} />
                 </div>
                 <div className={styles.rowButton}>
                   <label className={styles.automationRadioLabel}>
                     <input
                       type="radio"
-                      name="lightState"
+                      name="fan1State"
                       value="true"
-                      checked={editedData.lightState === true}
-                      onChange={() => setEditedData((prev) => ({ ...prev, lightState: true }))}
+                      checked={editedData.fan1State === true}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fan1State: true }))}
                     />
                     On
                   </label>
                   <label className={styles.automationRadioLabel}>
                     <input
                       type="radio"
-                      name="lightState"
+                      name="fan1State"
                       value="false"
-                      checked={editedData.lightState === false}
-                      onChange={() => setEditedData((prev) => ({ ...prev, lightState: false }))}
+                      checked={editedData.fan1State === false}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fan1State: false }))}
                     />
                     Off
                   </label>
                 </div>
                 <div className={styles.rowSet}>
-                  <button onClick={() => handleSetSensor("lightState")} className={styles.setButton}>
+                  <button onClick={() => handleSetSensor("fan1State")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+              </>
+            )}
+            {sensors.includes("Fan 2") && (
+              <>
+                <div className={styles.rowLabel}>
+                  <strong>Fan 2 State:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="text" value={latestData.fan2State ? "On" : "Off"} readOnly className={styles.sensorInput} />
+                </div>
+                <div className={styles.rowButton}>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="fan2State"
+                      value="true"
+                      checked={editedData.fan2State === true}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fan2State: true }))}
+                    />
+                    On
+                  </label>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="fan2State"
+                      value="false"
+                      checked={editedData.fan2State === false}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fan2State: false }))}
+                    />
+                    Off
+                  </label>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("fan2State")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+              </>
+            )}
+            {sensors.includes("Fan 3") && (
+              <>
+                <div className={styles.rowLabel}>
+                  <strong>Fan 3 State:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="text" value={latestData.fan3State ? "On" : "Off"} readOnly className={styles.sensorInput} />
+                </div>
+                <div className={styles.rowButton}>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="fan3State"
+                      value="true"
+                      checked={editedData.fan3State === true}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fan3State: true }))}
+                    />
+                    On
+                  </label>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="fan3State"
+                      value="false"
+                      checked={editedData.fan3State === false}
+                      onChange={() => setEditedData((prev) => ({ ...prev, fan3State: false }))}
+                    />
+                    Off
+                  </label>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("fan3State")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+              </>
+            )}
+            {/* Light Controls */}
+            {sensors.includes("Light 1") && (
+              <>
+                <div className={styles.rowLabel}>
+                  <strong>Light 1:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="number" value={latestData.light1} readOnly className={styles.sensorInput} />
+                  <span className={styles.unit}>lux</span>
+                </div>
+                <div className={styles.rowEdited}>
+                  <input
+                    type="number"
+                    value={editedData.light1}
+                    onChange={(e) => setEditedData((prev) => ({ ...prev, light1: e.target.value }))}
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
+                  <span className={styles.unit}>lux</span>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("light1")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+                <div className={styles.rowLabel}>
+                  <strong>Light 1 State:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="text" value={latestData.light1State ? "On" : "Off"} readOnly className={styles.sensorInput} />
+                </div>
+                <div className={styles.rowButton}>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="light1State"
+                      value="true"
+                      checked={editedData.light1State === true}
+                      onChange={() => setEditedData((prev) => ({ ...prev, light1State: true }))}
+                    />
+                    On
+                  </label>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="light1State"
+                      value="false"
+                      checked={editedData.light1State === false}
+                      onChange={() => setEditedData((prev) => ({ ...prev, light1State: false }))}
+                    />
+                    Off
+                  </label>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("light1State")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+              </>
+            )}
+            {sensors.includes("Light 2") && (
+              <>
+                <div className={styles.rowLabel}>
+                  <strong>Light 2:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="number" value={latestData.light2} readOnly className={styles.sensorInput} />
+                  <span className={styles.unit}>lux</span>
+                </div>
+                <div className={styles.rowEdited}>
+                  <input
+                    type="number"
+                    value={editedData.light2}
+                    onChange={(e) => setEditedData((prev) => ({ ...prev, light2: e.target.value }))}
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
+                  <span className={styles.unit}>lux</span>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("light2")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+                <div className={styles.rowLabel}>
+                  <strong>Light 2 State:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="text" value={latestData.light2State ? "On" : "Off"} readOnly className={styles.sensorInput} />
+                </div>
+                <div className={styles.rowButton}>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="light2State"
+                      value="true"
+                      checked={editedData.light2State === true}
+                      onChange={() => setEditedData((prev) => ({ ...prev, light2State: true }))}
+                    />
+                    On
+                  </label>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="light2State"
+                      value="false"
+                      checked={editedData.light2State === false}
+                      onChange={() => setEditedData((prev) => ({ ...prev, light2State: false }))}
+                    />
+                    Off
+                  </label>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("light2State")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+              </>
+            )}
+            {sensors.includes("Light 3") && (
+              <>
+                <div className={styles.rowLabel}>
+                  <strong>Light 3:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="number" value={latestData.light3} readOnly className={styles.sensorInput} />
+                  <span className={styles.unit}>lux</span>
+                </div>
+                <div className={styles.rowEdited}>
+                  <input
+                    type="number"
+                    value={editedData.light3}
+                    onChange={(e) => setEditedData((prev) => ({ ...prev, light3: e.target.value }))}
+                    onKeyDown={handleKeyDown}
+                    className={styles.sensorInput}
+                  />
+                  <span className={styles.unit}>lux</span>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("light3")} className={styles.setButton}>
+                    Set
+                  </button>
+                </div>
+                <div className={styles.rowLabel}>
+                  <strong>Light 3 State:</strong>
+                </div>
+                <div className={styles.rowLatest}>
+                  <input type="text" value={latestData.light3State ? "On" : "Off"} readOnly className={styles.sensorInput} />
+                </div>
+                <div className={styles.rowButton}>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="light3State"
+                      value="true"
+                      checked={editedData.light3State === true}
+                      onChange={() => setEditedData((prev) => ({ ...prev, light3State: true }))}
+                    />
+                    On
+                  </label>
+                  <label className={styles.automationRadioLabel}>
+                    <input
+                      type="radio"
+                      name="light3State"
+                      value="false"
+                      checked={editedData.light3State === false}
+                      onChange={() => setEditedData((prev) => ({ ...prev, light3State: false }))}
+                    />
+                    Off
+                  </label>
+                </div>
+                <div className={styles.rowSet}>
+                  <button onClick={() => handleSetSensor("light3State")} className={styles.setButton}>
                     Set
                   </button>
                 </div>
@@ -586,43 +862,6 @@ const ControlPanel = () => {
                   </button>
                 </div>
                 <div className={styles.rowSet}></div>
-              </>
-            )}
-            {sensors.includes("Fan") && (
-              <>
-                <div className={styles.rowLabel}>
-                  <strong>Fan State:</strong>
-                </div>
-                <div className={styles.rowLatest}>
-                  <input type="text" value={latestData.fanState ? "On" : "Off"} readOnly className={styles.sensorInput} />
-                </div>
-                <div className={styles.rowButton}>
-                  <label className={styles.automationRadioLabel}>
-                    <input
-                      type="radio"
-                      name="fanState"
-                      value="true"
-                      checked={editedData.fanState === true}
-                      onChange={() => setEditedData((prev) => ({ ...prev, fanState: true }))}
-                    />
-                    On
-                  </label>
-                  <label className={styles.automationRadioLabel}>
-                    <input
-                      type="radio"
-                      name="fanState"
-                      value="false"
-                      checked={editedData.fanState === false}
-                      onChange={() => setEditedData((prev) => ({ ...prev, fanState: false }))}
-                    />
-                    Off
-                  </label>
-                </div>
-                <div className={styles.rowSet}>
-                  <button onClick={() => handleSetSensor("fanState")} className={styles.setButton}>
-                    Set
-                  </button>
-                </div>
               </>
             )}
           </div>
@@ -804,21 +1043,23 @@ const ControlPanel = () => {
         <div className={styles.automationExistingList}>
           <h4>Existing Automations</h4>
           {automations.length === 0 && <p>No automations found.</p>}
-          {automations.map((auto) => (
-            <div key={auto.id} className={styles.automationItemRow}>
-              <div>
-                <strong>{computeAutomationLabel(auto)}</strong>
+          {automations.map((auto) => {
+            return (
+              <div key={auto.id} className={styles.automationItemRow}>
+                <div>
+                  <strong>{computeAutomationLabel(auto)}</strong>
+                </div>
+                <div>
+                  <button onClick={() => handleToggleEnabled(auto.id, auto.enabled)} className={`${styles.setButton} ${styles.automationToggleButton}`}>
+                    Toggle
+                  </button>
+                </div>
               </div>
-              <div>
-                <button onClick={() => handleToggleEnabled(auto.id, auto.enabled)} className={`${styles.setButton} ${styles.automationToggleButton}`}>
-                  Toggle
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <button onClick={handleClearAutomations} className={`${styles.setButton} ${styles.automationClearButton}`}>
-          Clear All Automations
+          Clear Automations
         </button>
       </div>
     </div>

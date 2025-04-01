@@ -1,11 +1,11 @@
 import React, { useState, useContext, useEffect } from "react";
 import { SensorContext } from "../SensorContext";
-import styles from "../Sensor.module.css"; 
+import styles from "../Sensor.module.css";
 
 const Sensor = () => {
   const { activeSensors, addSensor, removeSensor, clearSensors, selectedInstance } = useContext(SensorContext);
   const [selectedSensor, setSelectedSensor] = useState("");
-  // Added state for board type with default as GSMB
+  // Board type defaults to GSMB (as before)
   const [boardType, setBoardType] = useState("GSMB");
   // Local state to let the user choose which node the sensor is saved to
   const [selectedNode, setSelectedNode] = useState(selectedInstance);
@@ -15,11 +15,40 @@ const Sensor = () => {
     setSelectedNode(selectedInstance);
   }, [selectedInstance]);
 
-  // Mapping of board types to available sensor options
+  // Updated sensor options:
+  // - GSMB: remains unchanged.
+  // - HPCB: now includes Fan, Light, and Humidifier sensors with numbers 1-3.
+  // - NSCB: now includes Water Level along with Nutrient Level 1 and Nutrient Level 2.
   const sensorOptionsByBoardType = {
     GSMB: ["Temperature", "Humidity", "Soil Moisture"],
-    HPCB: ["Light", "Fan"],
-    NSCB: ["Water Level"],
+    HPCB: [
+      "Fan 1", "Fan 2", "Fan 3",
+      "Light 1", "Light 2", "Light 3",
+      "Humidifier 1", "Humidifier 2", "Humidifier 3"
+    ],
+    NSCB: ["Water Level", "Nutrient Level 1", "Nutrient Level 2"],
+  };
+
+  // Mutually exclusive groups for HPCB: for a given number, only one sensor (of type Fan, Light, or Humidifier) can be active.
+  const mutuallyExclusiveTypes = ["Fan", "Light", "Humidifier"];
+
+  // Disable an option if any sensor from the mutually exclusive groups with the same number is active.
+  // This logic applies only for HPCB.
+  const isOptionDisabled = (option) => {
+    const tokens = option.split(" ");
+    if (tokens.length < 2) return false;
+    const [optionType, optionNumber] = tokens;
+    if (!mutuallyExclusiveTypes.includes(optionType)) return false;
+    // Check active sensors for the current instance.
+    for (const sensor of activeSensors[selectedInstance] || []) {
+      const sensorTokens = sensor.split(" ");
+      if (sensorTokens.length < 2) continue;
+      const [activeType, activeNumber] = sensorTokens;
+      if (mutuallyExclusiveTypes.includes(activeType) && activeNumber === optionNumber) {
+        return true;
+      }
+    }
+    return false;
   };
 
   const handleSaveInstance = () => {
@@ -44,7 +73,7 @@ const Sensor = () => {
       <div className={styles.sensorGrid}>
         <h3 className={styles.instanceConfigTitle}>Instance Configuration</h3>
 
-        {/* New Board Type row */}
+        {/* Board Type row */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Board Type:</label>
@@ -65,10 +94,10 @@ const Sensor = () => {
           </div>
         </div>
 
-        {/* Sensor selection row */}
+        {/* Sensor/Variable selection row */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
-            <label className={styles.sensorLabel}>Sensor:</label>
+            <label className={styles.sensorLabel}>Variable:</label>
           </div>
           <div className={styles.rightColumn}>
             <select
@@ -76,9 +105,13 @@ const Sensor = () => {
               onChange={(e) => setSelectedSensor(e.target.value)}
               className={styles.sensorDropdown}
             >
-              <option value="">-- Select a Sensor --</option>
+              <option value="">-- Select a Variable --</option>
               {sensorOptionsByBoardType[boardType].map((option) => (
-                <option key={option} value={option}>
+                <option
+                  key={option}
+                  value={option}
+                  disabled={boardType === "HPCB" && isOptionDisabled(option)}
+                >
                   {option}
                 </option>
               ))}
