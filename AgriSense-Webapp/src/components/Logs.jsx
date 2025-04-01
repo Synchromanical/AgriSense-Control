@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef, useContext } from "react";
 import {
   collection,
-  onSnapshot,
   query,
+  where,
   orderBy,
+  onSnapshot,
   doc,
   deleteDoc,
   addDoc,
@@ -29,8 +30,13 @@ const Logs = () => {
   const fileInputRef = useRef(null);
   const logsPerPage = 25;
 
+  // Only subscribe to sensorData for the selected node (using nodeNumber as a number)
   useEffect(() => {
-    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
+    const q = query(
+      collection(db, "sensorData"),
+      where("nodeNumber", "==", Number(selectedInstance)),
+      orderBy("timestamp", "asc")
+    );
     const unsub = onSnapshot(q, (snapshot) => {
       const newLogs = [];
       snapshot.forEach((docSnap) => {
@@ -67,7 +73,7 @@ const Logs = () => {
       setLogs(newLogs);
     });
     return () => unsub();
-  }, []);
+  }, [selectedInstance]);
 
   const filteredLogs = logs.filter((log) => {
     const textMatch =
@@ -160,6 +166,7 @@ const Logs = () => {
             lightState: false,
             fanState: false,
             timestamp: stringTime,
+            nodeNumber: Number(selectedInstance), // Write nodeNumber as a number
           });
         }
       } catch (error) {

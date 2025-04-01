@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from "react";
-import { collection, query, orderBy, onSnapshot, addDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import styles from "../Dashboard.module.css";
 import { SensorContext } from "../SensorContext";
@@ -66,8 +66,13 @@ function Dashboard() {
   const { activeSensors, selectedInstance } = useContext(SensorContext);
   const sensors = activeSensors[selectedInstance] || [];
 
+  // Subscribe only to sensorData for the selected node (using nodeNumber as a number)
   useEffect(() => {
-    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
+    const q = query(
+      collection(db, "sensorData"),
+      where("nodeNumber", "==", Number(selectedInstance)),
+      orderBy("timestamp", "asc")
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -137,11 +142,11 @@ function Dashboard() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [selectedInstance]);
 
   useEffect(() => {
     import("firebase/firestore")
-      .then(({ onSnapshot }) => {
+      .then(({ onSnapshot, collection }) => {
         const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
           const docs = snapshot.docs.map((d) => ({
             id: d.id,
@@ -186,7 +191,9 @@ function Dashboard() {
             {sensors.includes("Temperature") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label><strong>Temperature:</strong></label>
+                  <label>
+                    <strong>Temperature:</strong>
+                  </label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input type="number" value={latestData.temperature} readOnly className={styles.sensorInput} />
@@ -197,7 +204,9 @@ function Dashboard() {
             {sensors.includes("Humidity") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label><strong>Humidity:</strong></label>
+                  <label>
+                    <strong>Humidity:</strong>
+                  </label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input type="number" value={latestData.humidity} readOnly className={styles.sensorInput} />
@@ -208,7 +217,9 @@ function Dashboard() {
             {sensors.includes("Soil Moisture") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label><strong>Soil Moisture:</strong></label>
+                  <label>
+                    <strong>Soil Moisture:</strong>
+                  </label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input type="number" value={latestData.soilMoisture} readOnly className={styles.sensorInput} />
@@ -219,7 +230,9 @@ function Dashboard() {
             {sensors.includes("Water Level") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
-                  <label><strong>Water Level:</strong></label>
+                  <label>
+                    <strong>Water Level:</strong>
+                  </label>
                 </div>
                 <div className={styles.sensorInputContainer}>
                   <input type="number" value={latestData.waterLevel} readOnly className={styles.sensorInput} />
@@ -231,7 +244,9 @@ function Dashboard() {
               <>
                 <div className={styles.sensorRow}>
                   <div className={styles.sensorLabel}>
-                    <label><strong>Light:</strong></label>
+                    <label>
+                      <strong>Light:</strong>
+                    </label>
                   </div>
                   <div className={styles.sensorInputContainer}>
                     <input type="number" value={latestData.light} readOnly className={styles.sensorInput} />
@@ -240,16 +255,30 @@ function Dashboard() {
                 </div>
                 <div className={styles.sensorRow}>
                   <div className={styles.sensorLabel}>
-                    <label><strong>Light State:</strong></label>
+                    <label>
+                      <strong>Light State:</strong>
+                    </label>
                   </div>
                   <div className={styles.sensorInputContainer}>
                     <div className={styles.radioGroup}>
                       <label>
-                        <input type="radio" name="lightState" value="true" checked={latestData.lightState === true} onChange={() => {}} />
+                        <input
+                          type="radio"
+                          name="lightState"
+                          value="true"
+                          checked={latestData.lightState === true}
+                          onChange={() => {}}
+                        />
                         On
                       </label>
                       <label>
-                        <input type="radio" name="lightState" value="false" checked={latestData.lightState === false} onChange={() => {}} />
+                        <input
+                          type="radio"
+                          name="lightState"
+                          value="false"
+                          checked={latestData.lightState === false}
+                          onChange={() => {}}
+                        />
                         Off
                       </label>
                     </div>
