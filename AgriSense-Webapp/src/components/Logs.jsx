@@ -1,140 +1,57 @@
-import React, { useEffect, useState, useRef, useContext } from "react";
-import {
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-  doc,
-  deleteDoc,
-  addDoc,
-} from "firebase/firestore";
-import { db } from "../firebaseConfig";
+// Logs.jsx
+import React, { useContext, useRef, useState } from "react";
 import styles from "../Logs.module.css";
 import { SensorContext } from "../SensorContext";
-
-function getTimestampString(date = new Date()) {
-  const iso = date.toISOString();
-  const [withoutMillis] = iso.split(".");
-  return withoutMillis + "Z";
-}
-
-const sensorMapping = {
-  temperature: { collection: "GSMB", field: "temperature" },
-  humidity: { collection: "GSMB", field: "humidity" },
-  soilmoisture: { collection: "GSMB", field: "soilMoisture" },
-  light: { collection: "HPCB", field: "light" },
-  lightstate: { collection: "HPCB", field: "lightState" },
-  fanstate: { collection: "HPCB", field: "fanState" },
-  waterlevel: { collection: "NSCB", field: "waterLevel" },
-};
+import { useDataContext } from "../DataContext";
 
 const Logs = () => {
   const { activeSensors, selectedInstance } = useContext(SensorContext);
+  const { dataState, importLogs, clearLogs } = useDataContext();
+
   const sensors = activeSensors[selectedInstance] || [];
-  const [mergedLogs, setMergedLogs] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const allLogs = dataState.mergedLogs;
+
+  // Logs filtering
   const [searchTerm, setSearchTerm] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+
   const fileInputRef = useRef(null);
-  const logsPerPage = 25;
 
-  // Existing code to merge logs from active boards remains unchanged…
-  useEffect(() => {
-    const collectionsNeeded = {};
-    sensors.forEach((sensor) => {
-      const key = sensor.toLowerCase().replace(/\s/g, "");
-      if (sensorMapping[key]) {
-        collectionsNeeded[sensorMapping[key].collection] = true;
-      }
-    });
-    const unsubscribes = [];
-    const logsByCollection = {};
-    Object.keys(collectionsNeeded).forEach((colName) => {
-      logsByCollection[colName] = [];
-      const q = query(collection(db, colName), orderBy("timestamp", "asc"));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        logsByCollection[colName] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          let timeObj = new Date(0);
-          if (data.timestamp && typeof data.timestamp === "string") {
-            const parsed = new Date(data.timestamp);
-            if (!isNaN(parsed.getTime())) {
-              timeObj = parsed;
-            }
-          }
-          const timeDisplay = timeObj.toLocaleString();
-          const sensorFields = [
-            { label: "Temperature", value: data.temperature },
-            { label: "Humidity", value: data.humidity },
-            { label: "Soil Moisture", value: data.soilMoisture },
-            { label: "Light", value: data.light },
-            { label: "Water Level", value: data.waterLevel },
-            { label: "Light State", value: data.lightState },
-            { label: "Fan State", value: data.fanState },
-          ];
-          const logs = [];
-          sensorFields.forEach((field) => {
-            if (field.value !== undefined && field.value !== null) {
-              logs.push({
-                time: timeObj,
-                timeDisplay,
-                action: `Reading of ${field.label}: ${field.value}`,
-              });
-            }
-          });
-          return logs;
-        }).flat();
-        const merged = Object.values(logsByCollection).flat();
-        merged.sort((a, b) => a.time - b.time);
-        merged.forEach((log, idx) => {
-          log.id = idx + 1;
-        });
-        setMergedLogs(merged);
-      });
-      unsubscribes.push(unsubscribe);
-    });
-    return () => unsubscribes.forEach((u) => u());
-  }, [sensors]);
+  // Filter to only logs relevant to these sensors
+  const relevantLogs = sensors.length
+    ? allLogs.filter((log) =>
+        sensors.some((s) => log.action.toLowerCase().includes(s.toLowerCase()))
+      )
+    : [];
 
-  const filteredLogs = mergedLogs.filter((log) => {
+  // Then apply text/time filters
+  const filteredLogs = relevantLogs.filter((log) => {
     const textMatch =
-      searchTerm === "" ||
+      !searchTerm ||
       log.id.toString().includes(searchTerm) ||
       log.action.toLowerCase().includes(searchTerm.toLowerCase());
-    let timeMatch = true;
+    if (!textMatch) return false;
+
+    const t = log.time.getTime();
     if (startTime) {
-      const startDate = new Date(startTime);
-      timeMatch = timeMatch && log.time >= startDate;
+      const st = new Date(startTime).getTime();
+      if (t < st) return false;
     }
     if (endTime) {
-      const endDate = new Date(endTime);
-      timeMatch = timeMatch && log.time <= endDate;
+      const et = new Date(endTime).getTime();
+      if (t > et) return false;
     }
-    const sensorMatch =
-      sensors.length > 0 &&
-      sensors.some((sensor) =>
-        log.action.toLowerCase().includes(sensor.toLowerCase())
-      );
-    return textMatch && timeMatch && sensorMatch;
+    return true;
   });
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, startTime, endTime, sensors]);
-
+  // Simple pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const logsPerPage = 25;
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
   const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);
   const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
 
   const renderPageNumbers = () => {
     const pages = [];
@@ -152,95 +69,57 @@ const Logs = () => {
     return pages;
   };
 
-  /*
-    UPDATED import: For each imported log item, create a full document in each board’s collection.
-    For GSMB: Temperature, Humidity, Soil Moisture, boardType "GSMB", timestamp.
-    For HPCB: Light, Light State, Fan State, boardType "HPCB", timestamp.
-    For NSCB: Water Level, boardType "NSCB", timestamp.
-  */
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage((p) => p + 1);
+    }
+  };
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage((p) => p - 1);
+    }
+  };
+
   const handleImportLogs = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = async (evt) => {
       try {
-        const imported = JSON.parse(event.target.result);
-        for (const item of imported) {
-          const stringTime = item.time ? item.time : getTimestampString();
-          // Create a document for GSMB with all required fields:
-          await addDoc(collection(db, "GSMB"), {
-            temperature: 0,
-            humidity: 0,
-            soilMoisture: 0,
-            boardType: "GSMB",
-            timestamp: stringTime,
-          });
-          // Create a document for HPCB with all required fields:
-          await addDoc(collection(db, "HPCB"), {
-            light: 0,
-            lightState: false,
-            fanState: false,
-            boardType: "HPCB",
-            timestamp: stringTime,
-          });
-          // Create a document for NSCB with all required fields:
-          await addDoc(collection(db, "NSCB"), {
-            waterLevel: 0,
-            boardType: "NSCB",
-            timestamp: stringTime,
-          });
-        }
-      } catch (error) {
-        console.error("Error parsing imported file", error);
+        const imported = JSON.parse(evt.target.result);
+        await importLogs(imported, sensors);
+      } catch (err) {
+        console.error("Error parsing imported logs", err);
       }
     };
     reader.readAsText(file);
   };
 
   const handleExportLogs = () => {
-    const exportData = mergedLogs.map((log) => ({
+    const exportData = relevantLogs.map((log) => ({
       id: log.id,
-      time: log.time?.toISOString() || null,
+      time: log.time.toISOString(),
       action: log.action,
     }));
-    const json = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "logs.json";
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
   const handleClearLogs = async () => {
-    try {
-      const collectionsToClear = {};
-      sensors.forEach((sensor) => {
-        const key = sensor.toLowerCase().replace(/\s/g, "");
-        if (sensorMapping[key]) {
-          collectionsToClear[sensorMapping[key].collection] = true;
-        }
-      });
-      for (const colName of Object.keys(collectionsToClear)) {
-        const snap = await import("firebase/firestore").then(({ getDocs }) =>
-          getDocs(collection(db, colName))
-        );
-        for (const logDoc of snap.docs) {
-          await deleteDoc(doc(db, colName, logDoc.id));
-        }
-      }
-    } catch (error) {
-      console.error("Error clearing logs:", error);
-    }
+    await clearLogs(sensors);
   };
 
   return (
     <div className={styles.content}>
       <h2>All Logs</h2>
-      {sensors.length === 0 ? (
+      {!sensors.length ? (
         <p>Please select a sensor in the Sensor tab to view logs.</p>
       ) : (
         <>
@@ -250,45 +129,46 @@ const Logs = () => {
                 <div className={styles.logsTimeTitle}>Search Between</div>
                 <div className={styles.logsTimeInputs}>
                   <div className={styles.logsTimeGroup}>
-                    <label htmlFor="startTime" className={styles.logsTimeLabel}>
-                      Start
-                    </label>
+                    <label className={styles.logsTimeLabel}>Start</label>
                     <input
                       type="datetime-local"
-                      id="startTime"
                       value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
+                      onChange={(e) => {
+                        setStartTime(e.target.value);
+                        setCurrentPage(1);
+                      }}
                       className={styles.logsTimeInput}
                     />
                   </div>
                   <div className={styles.logsTimeGroup}>
-                    <label htmlFor="endTime" className={styles.logsTimeLabel}>
-                      End
-                    </label>
+                    <label className={styles.logsTimeLabel}>End</label>
                     <input
                       type="datetime-local"
-                      id="endTime"
                       value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
+                      onChange={(e) => {
+                        setEndTime(e.target.value);
+                        setCurrentPage(1);
+                      }}
                       className={styles.logsTimeInput}
                     />
                   </div>
                 </div>
               </div>
               <div className={styles.logsTextSearch}>
-                <label htmlFor="logsSearch" className={styles.logsSearchLabel}>
-                  Search
-                </label>
+                <label className={styles.logsSearchLabel}>Search</label>
                 <input
                   type="text"
-                  id="logsSearch"
                   placeholder="Search by ID or Action..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className={styles.logsSearch}
                 />
               </div>
             </div>
+
             <table className={styles.logsTable}>
               <thead>
                 <tr>
@@ -314,6 +194,7 @@ const Logs = () => {
               </tbody>
             </table>
           </div>
+
           <div className={styles.logsActionButtons}>
             <div className={styles.logsButtons}>
               <button onClick={handleExportLogs} className={styles.logsButton}>
@@ -336,6 +217,7 @@ const Logs = () => {
               </button>
             </div>
           </div>
+
           {filteredLogs.length > logsPerPage && (
             <div className={styles.paginationContainer}>
               <button onClick={handlePrevPage} disabled={currentPage === 1} className={styles.paginationButton}>

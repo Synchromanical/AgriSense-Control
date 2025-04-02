@@ -1,3 +1,4 @@
+// App.jsx
 import React, { useContext } from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
@@ -14,7 +15,6 @@ function App() {
   return (
     <Router>
       <nav className={styles.navBar}>
-        {/* Centered links container */}
         <div className={styles.navLinksContainer}>
           <Link to="/" className={styles.navLink}>Dashboard</Link>
           <Link to="/graph" className={styles.navLink}>Graph</Link>
@@ -22,7 +22,6 @@ function App() {
           <Link to="/control-panel" className={styles.navLink}>Control Panel</Link>
           <Link to="/sensor" className={styles.navLink}>Sensor</Link>
         </div>
-        {/* Dropdown on the far right */}
         <div className={styles.instanceDropdownContainer}>
           <select
             value={selectedInstance}

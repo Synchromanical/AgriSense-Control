@@ -1,59 +1,81 @@
+// Sensor.jsx
 import React, { useState, useContext, useEffect } from "react";
 import { SensorContext } from "../SensorContext";
 import styles from "../Sensor.module.css";
 
+// 1) Create an object that groups your sensors by board type, but uses numeric indexes.
+const sensorOptionsByBoardType = {
+  GSMB: [
+    "Temperature", 
+    "Humidity", 
+    "Soil Moisture"
+  ],
+  HPCB: [
+    "Fan 1", "Fan 2", "Fan 3",
+    "Light 1", "Light 2", "Light 3",
+    "Humidifier 1", "Humidifier 2", "Humidifier 3",
+  ],
+  NSCB: [
+    "Water Level", 
+    "Nutrient 1 Level", 
+    "Nutrient 2 Level"
+  ],
+};
+
+// 2) Helper function to get the slot number (“1”, “2”, or “3”) from a sensor name.
+function getSensorSlot(sensorName) {
+  // For instance, “Light 1” -> "1", “Fan 1” -> "1".
+  // We'll search for the trailing digit with a simple RegExp or parseInt approach.
+  const match = sensorName.match(/\b(\d)\b/); 
+  return match ? match[1] : null; // e.g. “1”
+}
+
 const Sensor = () => {
   const { activeSensors, addSensor, removeSensor, clearSensors, selectedInstance } = useContext(SensorContext);
   const [selectedSensor, setSelectedSensor] = useState("");
-  // Board type defaults to GSMB (as before)
   const [boardType, setBoardType] = useState("GSMB");
-  // Local state to let the user choose which node the sensor is saved to
   const [selectedNode, setSelectedNode] = useState(selectedInstance);
 
-  // Sync the local selectedNode with the global selectedInstance when it changes
   useEffect(() => {
     setSelectedNode(selectedInstance);
   }, [selectedInstance]);
 
-  // Updated sensor options:
-  // - GSMB: remains unchanged.
-  // - HPCB: now includes Fan, Light, and Humidifier sensors with numbers 1-3.
-  // - NSCB: now includes Water Level along with Nutrient Level 1 and Nutrient Level 2.
-  const sensorOptionsByBoardType = {
-    GSMB: ["Temperature", "Humidity", "Soil Moisture"],
-    HPCB: [
-      "Fan 1", "Fan 2", "Fan 3",
-      "Light 1", "Light 2", "Light 3",
-      "Humidifier 1", "Humidifier 2", "Humidifier 3"
-    ],
-    NSCB: ["Water Level", "Nutrient 1 Level", "Nutrient 2 Level"],
-  };
+  // CHANGED: Extract the active sensors for the current instance
+  const sensorsForCurrentInstance = activeSensors[selectedInstance] || [];
 
-  // Mutually exclusive groups for HPCB: for a given number, only one sensor (of type Fan, Light, or Humidifier) can be active.
-  const mutuallyExclusiveTypes = ["Fan", "Light", "Humidifier"];
-
-  // Disable an option if any sensor from the mutually exclusive groups with the same number is active.
-  // This logic applies only for HPCB.
-  const isOptionDisabled = (option) => {
-    const tokens = option.split(" ");
-    if (tokens.length < 2) return false;
-    const [optionType, optionNumber] = tokens;
-    if (!mutuallyExclusiveTypes.includes(optionType)) return false;
-    // Check active sensors for the current instance.
-    for (const sensor of activeSensors[selectedInstance] || []) {
-      const sensorTokens = sensor.split(" ");
-      if (sensorTokens.length < 2) continue;
-      const [activeType, activeNumber] = sensorTokens;
-      if (mutuallyExclusiveTypes.includes(activeType) && activeNumber === optionNumber) {
-        return true;
-      }
+  /**
+   * 3) Build a set of “occupied slots” for the current instance’s sensors.
+   *    e.g. if “Light 1” is chosen, slot 1 is occupied, so “Fan 1” or “Humidifier 1” must be disabled.
+   */
+  const occupiedSlots = new Set();
+  // We only care about sensors that end in “1”, “2”, or “3”.
+  sensorsForCurrentInstance.forEach((existingSensor) => {
+    const slot = getSensorSlot(existingSensor); 
+    if (slot) {
+      occupiedSlots.add(slot); 
     }
-    return false;
+  });
+
+  /**
+   * 4) Decide if a sensor option should be disabled in the dropdown.
+   *    If it shares a slot with something else that’s already chosen, we disable it.
+   */
+  const isOptionDisabled = (option) => {
+    // If this sensor doesn't have a numeric index, we won't disable it. 
+    // e.g. “Temperature” doesn’t conflict with “Humidity,” etc.
+    const slot = getSensorSlot(option);
+    if (!slot) return false;
+
+    // If that slot is already in use, and the user hasn't chosen exactly this same sensor,
+    // we disable it.
+    return occupiedSlots.has(slot) && !sensorsForCurrentInstance.includes(option);
   };
 
   const handleSaveInstance = () => {
     if (!selectedSensor) return;
     addSensor(selectedNode, selectedSensor);
+    // You can reset the select after saving if you want:
+    setSelectedSensor("");
   };
 
   const handleDeleteSingle = (sensor) => {
@@ -64,16 +86,12 @@ const Sensor = () => {
     clearSensors(selectedInstance);
   };
 
-  // Only display sensors saved for the current global instance
-  const sensorsForCurrentInstance = activeSensors[selectedInstance] || [];
-
   return (
     <div className={styles.sensorContent}>
       <h2>Sensor Manager</h2>
       <div className={styles.sensorGrid}>
         <h3 className={styles.instanceConfigTitle}>Instance Configuration</h3>
 
-        {/* Board Type row */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Board Type:</label>
@@ -83,7 +101,7 @@ const Sensor = () => {
               value={boardType}
               onChange={(e) => {
                 setBoardType(e.target.value);
-                setSelectedSensor(""); // reset sensor selection when board type changes
+                setSelectedSensor("");
               }}
               className={styles.sensorDropdown}
             >
@@ -94,7 +112,6 @@ const Sensor = () => {
           </div>
         </div>
 
-        {/* Sensor/Variable selection row */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Variable:</label>
@@ -107,10 +124,10 @@ const Sensor = () => {
             >
               <option value="">-- Select a Variable --</option>
               {sensorOptionsByBoardType[boardType].map((option) => (
-                <option
-                  key={option}
+                <option 
+                  key={option} 
                   value={option}
-                  disabled={boardType === "HPCB" && isOptionDisabled(option)}
+                  disabled={isOptionDisabled(option)}
                 >
                   {option}
                 </option>
@@ -119,7 +136,6 @@ const Sensor = () => {
           </div>
         </div>
 
-        {/* Node selection row */}
         <div className={styles.formRow}>
           <div className={styles.leftColumn}>
             <label className={styles.sensorLabel}>Node:</label>
@@ -148,14 +164,12 @@ const Sensor = () => {
           </div>
         </div>
 
-        {/* Save button */}
         <div className={styles.buttonRow}>
           <button className={styles.saveButton} onClick={handleSaveInstance}>
             Save Instance
           </button>
         </div>
 
-        {/* Active Sensors list */}
         <h4 className={styles.automationHeading}>Active Sensors (Instance {selectedInstance})</h4>
         {sensorsForCurrentInstance.length === 0 && <p>No active sensors yet.</p>}
         {sensorsForCurrentInstance.map((sensor, index) => (

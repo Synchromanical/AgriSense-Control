@@ -1,455 +1,150 @@
-import React, { useEffect, useState, useContext } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import React, { useContext } from "react";
 import styles from "../Dashboard.module.css";
 import { SensorContext } from "../SensorContext";
-
-function formatOneDecimal(value) {
-  const num = parseFloat(value);
-  if (isNaN(num)) return "";
-  return num.toFixed(1);
-}
+import { useDataContext } from "../DataContext";
 
 const Dashboard = () => {
   const { activeSensors, selectedInstance } = useContext(SensorContext);
+  const { dataState } = useDataContext();
+
   const sensors = activeSensors[selectedInstance] || [];
+  const latestData = dataState.latest;
+  const allLogs = dataState.mergedLogs;
 
-  const [mergedReadings, setMergedReadings] = useState([]);
-  const [latestData, setLatestData] = useState({
-    temperature: "",
-    humidity: "",
-    soilMoisture: "",
-    light1: "",
-    light2: "",
-    light3: "",
-    light1State: false,
-    light2State: false,
-    light3State: false,
-    fan1State: false,
-    fan2State: false,
-    fan3State: false,
-    // Add new humidifiers:
-    humidifier1State: false,
-    humidifier2State: false,
-    humidifier3State: false,
+  // Include nutrient fields
+  const sensorMapping = {
+    "Temperature": [
+      { label: "Temperature", field: "temperature", unit: "°C" },
+    ],
+    "Humidity": [
+      { label: "Humidity", field: "humidity", unit: "%" },
+    ],
+    "Soil Moisture": [
+      { label: "Soil Moisture", field: "soilMoisture", unit: "%" },
+    ],
 
-    waterLevel: "",
-    timestamp: null,
-  });
-  const [rawDashboardLogs, setRawDashboardLogs] = useState([]);
-  const [allAutomations, setAllAutomations] = useState([]);
+    "Fan 1": [{ label: "Fan 1 State", field: "fan1State", isBoolean: true }],
+    "Fan 2": [{ label: "Fan 2 State", field: "fan2State", isBoolean: true }],
+    "Fan 3": [{ label: "Fan 3 State", field: "fan3State", isBoolean: true }],
 
-  useEffect(() => {
-    const boardsNeeded = new Set();
-    if (
-      sensors.includes("Temperature") ||
-      sensors.includes("Humidity") ||
-      sensors.includes("Soil Moisture")
-    ) {
-      boardsNeeded.add("GSMB");
-    }
-    if (sensors.some((s) => s.startsWith("Light") || s.startsWith("Fan") || s.startsWith("Humidifier"))) {
-      boardsNeeded.add("HPCB");
-    }
-    if (
-      sensors.includes("Water Level") ||
-      sensors.includes("Nutrient 1 Level") ||
-      sensors.includes("Nutrient 2 Level")
-    ) {
-      boardsNeeded.add("NSCB");
-    }
+    "Light 1": [
+      { label: "Light 1", field: "light1", unit: "lux" },
+      { label: "Light 1 State", field: "light1State", isBoolean: true },
+    ],
+    "Light 2": [
+      { label: "Light 2", field: "light2", unit: "lux" },
+      { label: "Light 2 State", field: "light2State", isBoolean: true },
+    ],
+    "Light 3": [
+      { label: "Light 3", field: "light3", unit: "lux" },
+      { label: "Light 3 State", field: "light3State", isBoolean: true },
+    ],
 
-    const unsubscribes = [];
-    const readingsByCollection = {};
+    "Humidifier 1": [
+      { label: "Humidifier 1 State", field: "humidifier1State", isBoolean: true },
+    ],
+    "Humidifier 2": [
+      { label: "Humidifier 2 State", field: "humidifier2State", isBoolean: true },
+    ],
+    "Humidifier 3": [
+      { label: "Humidifier 3 State", field: "humidifier3State", isBoolean: true },
+    ],
 
-    boardsNeeded.forEach((colName) => {
-      readingsByCollection[colName] = [];
-      const colRef = collection(db, colName);
-      const q = query(colRef, orderBy("timestamp", "asc"));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        readingsByCollection[colName] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          boardType: colName,
-        }));
-        const mergedAll = Object.values(readingsByCollection).flat();
-        mergedAll.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        setMergedReadings(mergedAll);
-      });
-      unsubscribes.push(unsubscribe);
-    });
+    "Water Level": [
+      { label: "Water Level", field: "waterLevel", unit: "%" },
+    ],
 
-    return () => unsubscribes.forEach((u) => u());
-  }, [sensors]);
+    // **Nutrient fields**:
+    "Nutrient 1 Level": [
+      { label: "Nutrient 1 Level", field: "nutrient1", unit: "%" },
+    ],
+    "Nutrient 2 Level": [
+      { label: "Nutrient 2 Level", field: "nutrient2", unit: "%" },
+    ],
+  };
 
-  useEffect(() => {
-    if (mergedReadings.length === 0) {
-      setLatestData({
-        temperature: "",
-        humidity: "",
-        soilMoisture: "",
-        light1: "",
-        light2: "",
-        light3: "",
-        light1State: false,
-        light2State: false,
-        light3State: false,
-        fan1State: false,
-        fan2State: false,
-        fan3State: false,
-        humidifier1State: false,
-        humidifier2State: false,
-        humidifier3State: false,
-        waterLevel: "",
-        timestamp: null,
-      });
-      setRawDashboardLogs([]);
-      return;
-    }
-
-    // Separate out the docs from each board
-    const gsmDocs = mergedReadings.filter((doc) => doc.boardType === "GSMB");
-    const hpcbDocs = mergedReadings.filter((doc) => doc.boardType === "HPCB");
-    const nscbDocs = mergedReadings.filter((doc) => doc.boardType === "NSCB");
-
-    const latestGSMB = gsmDocs.length
-      ? gsmDocs.reduce((a, b) => (new Date(a.timestamp) > new Date(b.timestamp) ? a : b))
-      : null;
-    const latestHPCB = hpcbDocs.length
-      ? hpcbDocs.reduce((a, b) => (new Date(a.timestamp) > new Date(b.timestamp) ? a : b))
-      : null;
-    const latestNSCB = nscbDocs.length
-      ? nscbDocs.reduce((a, b) => (new Date(a.timestamp) > new Date(b.timestamp) ? a : b))
-      : null;
-
-    // Combine the "latest" from each board
-    const combinedLatest = {
-      temperature: latestGSMB ? formatOneDecimal(latestGSMB.temperature) : "",
-      humidity: latestGSMB ? formatOneDecimal(latestGSMB.humidity) : "",
-      soilMoisture: latestGSMB ? formatOneDecimal(latestGSMB.soilMoisture) : "",
-
-      light1: latestHPCB && latestHPCB.light1 ? formatOneDecimal(latestHPCB.light1) : "",
-      light2: latestHPCB && latestHPCB.light2 ? formatOneDecimal(latestHPCB.light2) : "",
-      light3: latestHPCB && latestHPCB.light3 ? formatOneDecimal(latestHPCB.light3) : "",
-      light1State: latestHPCB ? !!latestHPCB.light1State : false,
-      light2State: latestHPCB ? !!latestHPCB.light2State : false,
-      light3State: latestHPCB ? !!latestHPCB.light3State : false,
-
-      fan1State: latestHPCB ? !!latestHPCB.fan1State : false,
-      fan2State: latestHPCB ? !!latestHPCB.fan2State : false,
-      fan3State: latestHPCB ? !!latestHPCB.fan3State : false,
-
-      // New humidifier states
-      humidifier1State: latestHPCB ? !!latestHPCB.humidifier1State : false,
-      humidifier2State: latestHPCB ? !!latestHPCB.humidifier2State : false,
-      humidifier3State: latestHPCB ? !!latestHPCB.humidifier3State : false,
-
-      waterLevel: latestNSCB ? formatOneDecimal(latestNSCB.waterLevel) : "",
-    };
-
-    const timestamps = [];
-    if (latestGSMB) timestamps.push(new Date(latestGSMB.timestamp));
-    if (latestHPCB) timestamps.push(new Date(latestHPCB.timestamp));
-    if (latestNSCB) timestamps.push(new Date(latestNSCB.timestamp));
-    const combinedTimestamp = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
-    combinedLatest.timestamp = combinedTimestamp;
-
-    setLatestData(combinedLatest);
-
-    // Build raw logs for display
-    const lines = [];
-    mergedReadings.forEach((docData) => {
-      let timeObj = new Date(0);
-      if (typeof docData.timestamp === "string") {
-        const parsed = new Date(docData.timestamp);
-        if (!isNaN(parsed.getTime())) {
-          timeObj = parsed;
-        }
-      }
-      const timeDisplay = timeObj.toLocaleString();
-      const sensorFields = [
-        { label: "Temperature", value: docData.temperature },
-        { label: "Humidity", value: docData.humidity },
-        { label: "Soil Moisture", value: docData.soilMoisture },
-        { label: "Light 1", value: docData.light1 },
-        { label: "Light 2", value: docData.light2 },
-        { label: "Light 3", value: docData.light3 },
-        { label: "Light 1 State", value: docData.light1State },
-        { label: "Light 2 State", value: docData.light2State },
-        { label: "Light 3 State", value: docData.light3State },
-        { label: "Fan 1 State", value: docData.fan1State },
-        { label: "Fan 2 State", value: docData.fan2State },
-        { label: "Fan 3 State", value: docData.fan3State },
-        // Add humidifier states to logs
-        { label: "Humidifier 1 State", value: docData.humidifier1State },
-        { label: "Humidifier 2 State", value: docData.humidifier2State },
-        { label: "Humidifier 3 State", value: docData.humidifier3State },
-
-        { label: "Water Level", value: docData.waterLevel },
-      ];
-      sensorFields.forEach((field) => {
-        if (field.value !== undefined && field.value !== null && field.value !== "") {
-          lines.push({
-            time: timeObj,
-            timeDisplay,
-            action: `Reading of ${field.label}: ${field.value}`,
-          });
-        }
-      });
-    });
-    lines.forEach((line, idx) => {
-      line.id = idx + 1;
-    });
-    setRawDashboardLogs(lines);
-  }, [mergedReadings]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "automations"), (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
-      setAllAutomations(docs);
-    });
-    return () => unsub();
-  }, []);
-
-  // Filter logs if you only want to display the ones relevant to the active sensors:
-  const filteredDashboardLogs = sensors.length
-    ? rawDashboardLogs.filter((log) =>
-        sensors.some((sensor) =>
-          log.action.toLowerCase().includes(sensor.toLowerCase())
-        )
+  // Filter logs to those relevant to these sensors
+  const filteredLogs = sensors.length
+    ? allLogs.filter((log) =>
+        sensors.some((s) => log.action.toLowerCase().includes(s.toLowerCase()))
       )
     : [];
 
-  const displayedDashboardLogs = filteredDashboardLogs.slice(-5).reverse();
+  // Show last 5 logs in descending order
+  const displayedDashboardLogs = filteredLogs.slice(-5).reverse();
+
+  // All automations
+  const allAutomations = dataState.automations;
 
   return (
     <div className={styles.content}>
       <h2>Dashboard</h2>
       <div className={styles.dashboardContainer}>
+        {/* LEFT: LATEST SENSOR DATA */}
         <div className={styles.sensorDataContainer}>
           <div className={styles.sensorData}>
             <h3>Latest Sensor Data</h3>
+            {sensors.map((sensorName) => {
+              const fieldDefs = sensorMapping[sensorName];
+              if (!fieldDefs) return null;
 
-            {sensors.includes("Temperature") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Temperature:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <input
-                    type="number"
-                    value={latestData.temperature}
-                    readOnly
-                    className={styles.sensorInput}
-                  />
-                  <span>°C</span>
-                </div>
-              </div>
-            )}
-            {sensors.includes("Humidity") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Humidity:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <input
-                    type="number"
-                    value={latestData.humidity}
-                    readOnly
-                    className={styles.sensorInput}
-                  />
-                  <span>%</span>
-                </div>
-              </div>
-            )}
-            {sensors.includes("Soil Moisture") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Soil Moisture:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <input
-                    type="number"
-                    value={latestData.soilMoisture}
-                    readOnly
-                    className={styles.sensorInput}
-                  />
-                  <span>%</span>
-                </div>
-              </div>
-            )}
-            {/* Fans */}
-            {sensors.includes("Fan 1") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Fan 1 State:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <div>{latestData.fan1State ? "On" : "Off"}</div>
-                </div>
-              </div>
-            )}
-            {sensors.includes("Fan 2") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Fan 2 State:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <div>{latestData.fan2State ? "On" : "Off"}</div>
-                </div>
-              </div>
-            )}
-            {sensors.includes("Fan 3") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Fan 3 State:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <div>{latestData.fan3State ? "On" : "Off"}</div>
-                </div>
-              </div>
-            )}
-            {/* Lights */}
-            {sensors.includes("Light 1") && (
-              <>
-                <div className={styles.sensorRow}>
-                  <div className={styles.sensorLabel}>
-                    <label><strong>Light 1:</strong></label>
-                  </div>
-                  <div className={styles.sensorInputContainer}>
-                    <input
-                      type="number"
-                      value={latestData.light1}
-                      readOnly
-                      className={styles.sensorInput}
-                    />
-                    <span>lux</span>
-                  </div>
-                </div>
-                <div className={styles.sensorRow}>
-                  <div className={styles.sensorLabel}>
-                    <label><strong>Light 1 State:</strong></label>
-                  </div>
-                  <div className={styles.sensorInputContainer}>
-                    <div>{latestData.light1State ? "On" : "Off"}</div>
-                  </div>
-                </div>
-              </>
-            )}
-            {sensors.includes("Light 2") && (
-              <>
-                <div className={styles.sensorRow}>
-                  <div className={styles.sensorLabel}>
-                    <label><strong>Light 2:</strong></label>
-                  </div>
-                  <div className={styles.sensorInputContainer}>
-                    <input
-                      type="number"
-                      value={latestData.light2}
-                      readOnly
-                      className={styles.sensorInput}
-                    />
-                    <span>lux</span>
-                  </div>
-                </div>
-                <div className={styles.sensorRow}>
-                  <div className={styles.sensorLabel}>
-                    <label><strong>Light 2 State:</strong></label>
-                  </div>
-                  <div className={styles.sensorInputContainer}>
-                    <div>{latestData.light2State ? "On" : "Off"}</div>
-                  </div>
-                </div>
-              </>
-            )}
-            {sensors.includes("Light 3") && (
-              <>
-                <div className={styles.sensorRow}>
-                  <div className={styles.sensorLabel}>
-                    <label><strong>Light 3:</strong></label>
-                  </div>
-                  <div className={styles.sensorInputContainer}>
-                    <input
-                      type="number"
-                      value={latestData.light3}
-                      readOnly
-                      className={styles.sensorInput}
-                    />
-                    <span>lux</span>
-                  </div>
-                </div>
-                <div className={styles.sensorRow}>
-                  <div className={styles.sensorLabel}>
-                    <label><strong>Light 3 State:</strong></label>
-                  </div>
-                  <div className={styles.sensorInputContainer}>
-                    <div>{latestData.light3State ? "On" : "Off"}</div>
-                  </div>
-                </div>
-              </>
-            )}
-            {/* Humidifiers */}
-            {sensors.includes("Humidifier 1") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Humidifier 1 State:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <div>{latestData.humidifier1State ? "On" : "Off"}</div>
-                </div>
-              </div>
-            )}
-            {sensors.includes("Humidifier 2") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Humidifier 2 State:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <div>{latestData.humidifier2State ? "On" : "Off"}</div>
-                </div>
-              </div>
-            )}
-            {sensors.includes("Humidifier 3") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Humidifier 3 State:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <div>{latestData.humidifier3State ? "On" : "Off"}</div>
-                </div>
-              </div>
-            )}
-            {/* Water Level */}
-            {sensors.includes("Water Level") && (
-              <div className={styles.sensorRow}>
-                <div className={styles.sensorLabel}>
-                  <label><strong>Water Level:</strong></label>
-                </div>
-                <div className={styles.sensorInputContainer}>
-                  <input
-                    type="number"
-                    value={latestData.waterLevel}
-                    readOnly
-                    className={styles.sensorInput}
-                  />
-                  <span>%</span>
-                </div>
-              </div>
-            )}
+              return fieldDefs.map((def) => {
+                const rawValue = latestData[def.field];
+                if (def.isBoolean) {
+                  return (
+                    <div
+                      className={styles.sensorRow}
+                      key={`${sensorName}-${def.field}`}
+                    >
+                      <div className={styles.sensorLabel}>
+                        <strong>{def.label}:</strong>
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          readOnly
+                          value={rawValue ? "On" : "Off"}
+                          className={styles.sensorInput}
+                        />
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div
+                      className={styles.sensorRow}
+                      key={`${sensorName}-${def.field}`}
+                    >
+                      <div className={styles.sensorLabel}>
+                        <strong>{def.label}:</strong>
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          readOnly
+                          value={rawValue ?? ""}
+                          className={styles.sensorInput}
+                        />
+                        {def.unit && <span>{def.unit}</span>}
+                      </div>
+                    </div>
+                  );
+                }
+              });
+            })}
           </div>
         </div>
+
+        {/* RIGHT: LATEST LOGS */}
         <div className={styles.dashboardLogsContainer}>
           <h3>Latest Logs</h3>
           {displayedDashboardLogs.length > 0 ? (
             <table className={styles.logsTable}>
               <thead>
                 <tr>
-                  <th className={styles.logsTh}>ID</th>
-                  <th className={styles.logsTh}>Time</th>
-                  <th className={styles.logsTh}>Action</th>
+                  <th>ID</th>
+                  <th>Time</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -467,9 +162,11 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+      {/* AUTOMATIONS */}
       <div className={styles.dashboardAutomationsContainer}>
         <h3>Automations</h3>
-        {allAutomations.length === 0 ? (
+        {!allAutomations.length ? (
           <p>No automations found.</p>
         ) : (
           <table className={styles.upcomingAutomationsTable}>
@@ -487,7 +184,7 @@ const Dashboard = () => {
                   <td>{auto.name}</td>
                   <td>{auto.type}</td>
                   <td>{auto.action}</td>
-                  <td>{typeof auto.enabled === "boolean" ? (auto.enabled ? "Yes" : "No") : "N/A"}</td>
+                  <td>{auto.enabled ? "Yes" : "No"}</td>
                 </tr>
               ))}
             </tbody>
