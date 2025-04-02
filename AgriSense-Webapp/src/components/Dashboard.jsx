@@ -28,6 +28,11 @@ const Dashboard = () => {
     fan1State: false,
     fan2State: false,
     fan3State: false,
+    // Add new humidifiers:
+    humidifier1State: false,
+    humidifier2State: false,
+    humidifier3State: false,
+
     waterLevel: "",
     timestamp: null,
   });
@@ -36,16 +41,20 @@ const Dashboard = () => {
 
   useEffect(() => {
     const boardsNeeded = new Set();
-    if (sensors.includes("Temperature") || sensors.includes("Humidity") || sensors.includes("Soil Moisture")) {
+    if (
+      sensors.includes("Temperature") ||
+      sensors.includes("Humidity") ||
+      sensors.includes("Soil Moisture")
+    ) {
       boardsNeeded.add("GSMB");
     }
-    if (sensors.some((s) => s.startsWith("Light") || s.startsWith("Fan"))) {
+    if (sensors.some((s) => s.startsWith("Light") || s.startsWith("Fan") || s.startsWith("Humidifier"))) {
       boardsNeeded.add("HPCB");
     }
     if (
       sensors.includes("Water Level") ||
-      sensors.includes("Nutrient Level 1") ||
-      sensors.includes("Nutrient Level 2")
+      sensors.includes("Nutrient 1 Level") ||
+      sensors.includes("Nutrient 2 Level")
     ) {
       boardsNeeded.add("NSCB");
     }
@@ -88,6 +97,9 @@ const Dashboard = () => {
         fan1State: false,
         fan2State: false,
         fan3State: false,
+        humidifier1State: false,
+        humidifier2State: false,
+        humidifier3State: false,
         waterLevel: "",
         timestamp: null,
       });
@@ -95,6 +107,7 @@ const Dashboard = () => {
       return;
     }
 
+    // Separate out the docs from each board
     const gsmDocs = mergedReadings.filter((doc) => doc.boardType === "GSMB");
     const hpcbDocs = mergedReadings.filter((doc) => doc.boardType === "HPCB");
     const nscbDocs = mergedReadings.filter((doc) => doc.boardType === "NSCB");
@@ -109,19 +122,28 @@ const Dashboard = () => {
       ? nscbDocs.reduce((a, b) => (new Date(a.timestamp) > new Date(b.timestamp) ? a : b))
       : null;
 
+    // Combine the "latest" from each board
     const combinedLatest = {
       temperature: latestGSMB ? formatOneDecimal(latestGSMB.temperature) : "",
       humidity: latestGSMB ? formatOneDecimal(latestGSMB.humidity) : "",
       soilMoisture: latestGSMB ? formatOneDecimal(latestGSMB.soilMoisture) : "",
+
       light1: latestHPCB && latestHPCB.light1 ? formatOneDecimal(latestHPCB.light1) : "",
       light2: latestHPCB && latestHPCB.light2 ? formatOneDecimal(latestHPCB.light2) : "",
       light3: latestHPCB && latestHPCB.light3 ? formatOneDecimal(latestHPCB.light3) : "",
-      light1State: latestHPCB ? latestHPCB.light1State : false,
-      light2State: latestHPCB ? latestHPCB.light2State : false,
-      light3State: latestHPCB ? latestHPCB.light3State : false,
-      fan1State: latestHPCB ? latestHPCB.fan1State : false,
-      fan2State: latestHPCB ? latestHPCB.fan2State : false,
-      fan3State: latestHPCB ? latestHPCB.fan3State : false,
+      light1State: latestHPCB ? !!latestHPCB.light1State : false,
+      light2State: latestHPCB ? !!latestHPCB.light2State : false,
+      light3State: latestHPCB ? !!latestHPCB.light3State : false,
+
+      fan1State: latestHPCB ? !!latestHPCB.fan1State : false,
+      fan2State: latestHPCB ? !!latestHPCB.fan2State : false,
+      fan3State: latestHPCB ? !!latestHPCB.fan3State : false,
+
+      // New humidifier states
+      humidifier1State: latestHPCB ? !!latestHPCB.humidifier1State : false,
+      humidifier2State: latestHPCB ? !!latestHPCB.humidifier2State : false,
+      humidifier3State: latestHPCB ? !!latestHPCB.humidifier3State : false,
+
       waterLevel: latestNSCB ? formatOneDecimal(latestNSCB.waterLevel) : "",
     };
 
@@ -134,6 +156,7 @@ const Dashboard = () => {
 
     setLatestData(combinedLatest);
 
+    // Build raw logs for display
     const lines = [];
     mergedReadings.forEach((docData) => {
       let timeObj = new Date(0);
@@ -157,6 +180,11 @@ const Dashboard = () => {
         { label: "Fan 1 State", value: docData.fan1State },
         { label: "Fan 2 State", value: docData.fan2State },
         { label: "Fan 3 State", value: docData.fan3State },
+        // Add humidifier states to logs
+        { label: "Humidifier 1 State", value: docData.humidifier1State },
+        { label: "Humidifier 2 State", value: docData.humidifier2State },
+        { label: "Humidifier 3 State", value: docData.humidifier3State },
+
         { label: "Water Level", value: docData.waterLevel },
       ];
       sensorFields.forEach((field) => {
@@ -186,9 +214,12 @@ const Dashboard = () => {
     return () => unsub();
   }, []);
 
+  // Filter logs if you only want to display the ones relevant to the active sensors:
   const filteredDashboardLogs = sensors.length
     ? rawDashboardLogs.filter((log) =>
-        sensors.some((sensor) => log.action.toLowerCase().includes(sensor.toLowerCase()))
+        sensors.some((sensor) =>
+          log.action.toLowerCase().includes(sensor.toLowerCase())
+        )
       )
     : [];
 
@@ -201,6 +232,7 @@ const Dashboard = () => {
         <div className={styles.sensorDataContainer}>
           <div className={styles.sensorData}>
             <h3>Latest Sensor Data</h3>
+
             {sensors.includes("Temperature") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
@@ -249,7 +281,7 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
-            {/* Fan Displays */}
+            {/* Fans */}
             {sensors.includes("Fan 1") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
@@ -280,7 +312,7 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
-            {/* Light Displays */}
+            {/* Lights */}
             {sensors.includes("Light 1") && (
               <>
                 <div className={styles.sensorRow}>
@@ -359,6 +391,38 @@ const Dashboard = () => {
                 </div>
               </>
             )}
+            {/* Humidifiers */}
+            {sensors.includes("Humidifier 1") && (
+              <div className={styles.sensorRow}>
+                <div className={styles.sensorLabel}>
+                  <label><strong>Humidifier 1 State:</strong></label>
+                </div>
+                <div className={styles.sensorInputContainer}>
+                  <div>{latestData.humidifier1State ? "On" : "Off"}</div>
+                </div>
+              </div>
+            )}
+            {sensors.includes("Humidifier 2") && (
+              <div className={styles.sensorRow}>
+                <div className={styles.sensorLabel}>
+                  <label><strong>Humidifier 2 State:</strong></label>
+                </div>
+                <div className={styles.sensorInputContainer}>
+                  <div>{latestData.humidifier2State ? "On" : "Off"}</div>
+                </div>
+              </div>
+            )}
+            {sensors.includes("Humidifier 3") && (
+              <div className={styles.sensorRow}>
+                <div className={styles.sensorLabel}>
+                  <label><strong>Humidifier 3 State:</strong></label>
+                </div>
+                <div className={styles.sensorInputContainer}>
+                  <div>{latestData.humidifier3State ? "On" : "Off"}</div>
+                </div>
+              </div>
+            )}
+            {/* Water Level */}
             {sensors.includes("Water Level") && (
               <div className={styles.sensorRow}>
                 <div className={styles.sensorLabel}>
@@ -404,7 +468,7 @@ const Dashboard = () => {
         </div>
       </div>
       <div className={styles.dashboardAutomationsContainer}>
-        <h3>All Automations</h3>
+        <h3>Automations</h3>
         {allAutomations.length === 0 ? (
           <p>No automations found.</p>
         ) : (

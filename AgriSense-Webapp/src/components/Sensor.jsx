@@ -26,7 +26,7 @@ const Sensor = () => {
       "Light 1", "Light 2", "Light 3",
       "Humidifier 1", "Humidifier 2", "Humidifier 3"
     ],
-    NSCB: ["Water Level", "Nutrient Level 1", "Nutrient Level 2"],
+    NSCB: ["Water Level", "Nutrient 1 Level", "Nutrient 2 Level"],
   };
 
   // Mutually exclusive groups for HPCB: for a given number, only one sensor (of type Fan, Light, or Humidifier) can be active.
