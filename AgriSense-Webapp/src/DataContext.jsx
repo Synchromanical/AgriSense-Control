@@ -39,9 +39,11 @@ const initialDataState = {
     humidity: "",
     soilMoisture: "",
 
+    // numeric lux
     light1: "",
     light2: "",
     light3: "",
+    // boolean on/off
     light1State: false,
     light2State: false,
     light3State: false,
@@ -56,7 +58,6 @@ const initialDataState = {
 
     waterLevel: "",
 
-    // **Add these two so the dashboard can show them**
     nutrient1: "",
     nutrient2: "",
 
@@ -137,9 +138,11 @@ export const DataProvider = ({ children }) => {
       humidity: latestGSMB ? formatOneDecimal(latestGSMB.humidity) : "",
       soilMoisture: latestGSMB ? formatOneDecimal(latestGSMB.soilMoisture) : "",
 
+      // numeric lux
       light1: latestHPCB?.light1 ? formatOneDecimal(latestHPCB.light1) : "",
       light2: latestHPCB?.light2 ? formatOneDecimal(latestHPCB.light2) : "",
       light3: latestHPCB?.light3 ? formatOneDecimal(latestHPCB.light3) : "",
+      // on/off
       light1State: latestHPCB?.light1State ?? false,
       light2State: latestHPCB?.light2State ?? false,
       light3State: latestHPCB?.light3State ?? false,
@@ -156,7 +159,6 @@ export const DataProvider = ({ children }) => {
         ? formatOneDecimal(latestNSCB.waterLevel)
         : "",
 
-      // **Pull from the latest NSCB doc.** Use formatOneDecimal if you want 1 decimal.
       nutrient1: latestNSCB?.nutrient1
         ? formatOneDecimal(latestNSCB.nutrient1)
         : "",
@@ -202,14 +204,13 @@ export const DataProvider = ({ children }) => {
         const timeObj = parseTimestamp(d.timestamp);
         const timeDisplay = timeObj.toLocaleString();
 
-        // **Include your nutrient1, nutrient2, etc.** 
         const sensorFields = [
           { label: "Temperature", value: d.temperature },
           { label: "Humidity", value: d.humidity },
           { label: "Soil Moisture", value: d.soilMoisture },
-          { label: "Light 1", value: d.light1 },
-          { label: "Light 2", value: d.light2 },
-          { label: "Light 3", value: d.light3 },
+          { label: "Light 1 (lux)", value: d.light1 },
+          { label: "Light 2 (lux)", value: d.light2 },
+          { label: "Light 3 (lux)", value: d.light3 },
           { label: "Light 1 State", value: d.light1State },
           { label: "Light 2 State", value: d.light2State },
           { label: "Light 3 State", value: d.light3State },
@@ -220,8 +221,6 @@ export const DataProvider = ({ children }) => {
           { label: "Humidifier 2 State", value: d.humidifier2State },
           { label: "Humidifier 3 State", value: d.humidifier3State },
           { label: "Water Level", value: d.waterLevel },
-
-          // **Here are the new ones:**
           { label: "Nutrient 1 Level", value: d.nutrient1 },
           { label: "Nutrient 2 Level", value: d.nutrient2 },
         ];
@@ -257,13 +256,18 @@ export const DataProvider = ({ children }) => {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  4) CREATE NEW READING (Copy-latest approach) 
+  //  4) CREATE NEW READING (Copy-latest approach)
+  //      *** UPDATED to handle numeric light1, light2, light3 ***
   // ─────────────────────────────────────────────────────────────
   async function createNewReading(fieldsToUpdate, activeSensors) {
     const boardsNeeded = new Set();
     activeSensors.forEach((sensorName) => {
       const lower = sensorName.toLowerCase();
-      if (["temperature", "humidity", "soil moisture"].some((w) => lower.includes(w))) {
+      if (
+        lower.includes("temperature") ||
+        lower.includes("humidity") ||
+        lower.includes("soil moisture")
+      ) {
         boardsNeeded.add("GSMB");
       }
       if (
@@ -273,7 +277,6 @@ export const DataProvider = ({ children }) => {
       ) {
         boardsNeeded.add("HPCB");
       }
-      // **Nutrients or water go to NSCB** 
       if (lower.includes("water") || lower.includes("nutrient")) {
         boardsNeeded.add("NSCB");
       }
@@ -305,16 +308,10 @@ export const DataProvider = ({ children }) => {
 
       // GSMB fields
       if (board === "GSMB") {
-        if (
-          activeSensors.includes("Temperature") &&
-          fieldsToUpdate.hasOwnProperty("temperature")
-        ) {
+        if (activeSensors.includes("Temperature") && fieldsToUpdate.hasOwnProperty("temperature")) {
           docData.temperature = parseFloat(fieldsToUpdate.temperature) || 0;
         }
-        if (
-          activeSensors.includes("Humidity") &&
-          fieldsToUpdate.hasOwnProperty("humidity")
-        ) {
+        if (activeSensors.includes("Humidity") && fieldsToUpdate.hasOwnProperty("humidity")) {
           docData.humidity = parseFloat(fieldsToUpdate.humidity) || 0;
         }
         if (
@@ -327,47 +324,44 @@ export const DataProvider = ({ children }) => {
 
       // HPCB fields
       if (board === "HPCB") {
-        // Fans
-        if (
-          activeSensors.includes("Fan 1") &&
-          fieldsToUpdate.hasOwnProperty("fan1State")
-        ) {
+        // FANS
+        if (activeSensors.includes("Fan 1") && fieldsToUpdate.hasOwnProperty("fan1State")) {
           docData.fan1State = fieldsToUpdate.fan1State;
         }
-        if (
-          activeSensors.includes("Fan 2") &&
-          fieldsToUpdate.hasOwnProperty("fan2State")
-        ) {
+        if (activeSensors.includes("Fan 2") && fieldsToUpdate.hasOwnProperty("fan2State")) {
           docData.fan2State = fieldsToUpdate.fan2State;
         }
-        if (
-          activeSensors.includes("Fan 3") &&
-          fieldsToUpdate.hasOwnProperty("fan3State")
-        ) {
+        if (activeSensors.includes("Fan 3") && fieldsToUpdate.hasOwnProperty("fan3State")) {
           docData.fan3State = fieldsToUpdate.fan3State;
         }
 
-        // Lights
-        if (
-          activeSensors.includes("Light 1") &&
-          fieldsToUpdate.hasOwnProperty("light1State")
-        ) {
-          docData.light1State = fieldsToUpdate.light1State;
+        // LIGHTS: numeric + boolean
+        if (activeSensors.includes("Light 1")) {
+          if (fieldsToUpdate.hasOwnProperty("light1")) {
+            docData.light1 = parseFloat(fieldsToUpdate.light1) || 0;
+          }
+          if (fieldsToUpdate.hasOwnProperty("light1State")) {
+            docData.light1State = fieldsToUpdate.light1State;
+          }
         }
-        if (
-          activeSensors.includes("Light 2") &&
-          fieldsToUpdate.hasOwnProperty("light2State")
-        ) {
-          docData.light2State = fieldsToUpdate.light2State;
+        if (activeSensors.includes("Light 2")) {
+          if (fieldsToUpdate.hasOwnProperty("light2")) {
+            docData.light2 = parseFloat(fieldsToUpdate.light2) || 0;
+          }
+          if (fieldsToUpdate.hasOwnProperty("light2State")) {
+            docData.light2State = fieldsToUpdate.light2State;
+          }
         }
-        if (
-          activeSensors.includes("Light 3") &&
-          fieldsToUpdate.hasOwnProperty("light3State")
-        ) {
-          docData.light3State = fieldsToUpdate.light3State;
+        if (activeSensors.includes("Light 3")) {
+          if (fieldsToUpdate.hasOwnProperty("light3")) {
+            docData.light3 = parseFloat(fieldsToUpdate.light3) || 0;
+          }
+          if (fieldsToUpdate.hasOwnProperty("light3State")) {
+            docData.light3State = fieldsToUpdate.light3State;
+          }
         }
 
-        // Humidifiers
+        // HUMIDIFIERS
         if (
           activeSensors.includes("Humidifier 1") &&
           fieldsToUpdate.hasOwnProperty("humidifier1State")
@@ -390,23 +384,13 @@ export const DataProvider = ({ children }) => {
 
       // NSCB fields (water + nutrients)
       if (board === "NSCB") {
-        if (
-          activeSensors.includes("Water Level") &&
-          fieldsToUpdate.hasOwnProperty("waterLevel")
-        ) {
+        if (activeSensors.includes("Water Level") && fieldsToUpdate.hasOwnProperty("waterLevel")) {
           docData.waterLevel = parseFloat(fieldsToUpdate.waterLevel) || 0;
         }
-        // **Uncomment or add these lines for nutrients:**
-        if (
-          activeSensors.includes("Nutrient 1 Level") &&
-          fieldsToUpdate.hasOwnProperty("nutrient1")
-        ) {
+        if (activeSensors.includes("Nutrient 1 Level") && fieldsToUpdate.hasOwnProperty("nutrient1")) {
           docData.nutrient1 = parseFloat(fieldsToUpdate.nutrient1) || 0;
         }
-        if (
-          activeSensors.includes("Nutrient 2 Level") &&
-          fieldsToUpdate.hasOwnProperty("nutrient2")
-        ) {
+        if (activeSensors.includes("Nutrient 2 Level") && fieldsToUpdate.hasOwnProperty("nutrient2")) {
           docData.nutrient2 = parseFloat(fieldsToUpdate.nutrient2) || 0;
         }
       }
@@ -420,14 +404,14 @@ export const DataProvider = ({ children }) => {
   }
 
   // AUTOMATIONS
-  async function createAutomation(payload) { /* ... */ }
-  async function updateAutomation(id, payload) { /* ... */ }
-  async function deleteAutomation(id) { /* ... */ }
-  async function clearAllAutomations() { /* ... */ }
+  async function createAutomation(payload) { /* ... or omitted ... */ }
+  async function updateAutomation(id, payload) { /* ... or omitted ... */ }
+  async function deleteAutomation(id) { /* ... or omitted ... */ }
+  async function clearAllAutomations() { /* ... or omitted ... */ }
 
   // LOGS
-  async function importLogs(jsonItems, activeSensors) { /* ... */ }
-  async function clearLogs(activeSensors) { /* ... */ }
+  async function importLogs(jsonItems, activeSensors) { /* ... or omitted ... */ }
+  async function clearLogs(activeSensors) { /* ... or omitted ... */ }
 
   const value = {
     dataState,
