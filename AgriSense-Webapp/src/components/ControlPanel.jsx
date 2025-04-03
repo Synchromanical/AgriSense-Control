@@ -1,15 +1,10 @@
 // ControlPanel.jsx
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import styles from "../ControlPanel.module.css";
 import { SensorContext } from "../SensorContext";
 import { useDataContext } from "../DataContext";
 
-/**
- * sensorMap: each sensor can map to one or more fields.
- * - "Water Level" gets a numeric reading in "Latest", but we'll replace the
- *   "Edited" text box with a "Fill 100%" button in the UI logic below.
- * - For "Light X," we show numeric + boolean fields, etc.
- */
+// Mapping each sensor to Firestore fields
 const sensorMap = {
   "Temperature": [
     { field: "temperature", label: "Temperature", unit: "°C", isBoolean: false },
@@ -79,17 +74,15 @@ function ControlPanel() {
 
   // Local state for editing each field (numeric or boolean)
   const [editedData, setEditedData] = useState({
-    // numeric
     temperature: "",
     humidity: "",
     soilMoisture: "",
-    waterLevel: "",   // We'll override the UI for this below
+    waterLevel: "",
     nutrient1: "",
     nutrient2: "",
     light1: "",
     light2: "",
     light3: "",
-    // boolean
     fan1State: false,
     fan2State: false,
     fan3State: false,
@@ -101,9 +94,9 @@ function ControlPanel() {
     humidifier3State: false,
   });
 
-  // Restrict numeric input to digits + special keys
+  // Restrict numeric input
   const handleKeyDown = (e) => {
-    const allowed = [
+    const allowedKeys = [
       "ArrowUp",
       "ArrowDown",
       "ArrowLeft",
@@ -115,7 +108,7 @@ function ControlPanel() {
       ".",
     ];
     const isNumberKey = /[0-9]/.test(e.key);
-    if (!allowed.includes(e.key) && !isNumberKey) {
+    if (!allowedKeys.includes(e.key) && !isNumberKey) {
       e.preventDefault();
     }
   };
@@ -135,91 +128,116 @@ function ControlPanel() {
     await createNewReading({ waterLevel: 100 }, sensors);
   };
 
-  // ─────────────────────────────────────────────────────────────
-  //               AUTOMATIONS (UPDATED SECTION)
-  // ─────────────────────────────────────────────────────────────
-
-  // We still pull automations from the data context
+  // ------------------------------------------------------------
+  // AUTOMATIONS
+  // ------------------------------------------------------------
   const automations = dataState.automations;
-
-  // Local state for which automation is selected & the form data
   const [selectedAutomationId, setSelectedAutomationId] = useState("");
 
-  // We keep boardType (if you want to continue specifying it), otherwise remove it
-  const [automationBoardType, setAutomationBoardType] = useState("NSCB");
+  // Board type selection (unchanged)
+  const [automationBoardType, setAutomationBoardType] = useState("HPCB");
 
-  // Updated automation form includes "repeatSchedule" instead of "timeLength/timeUnit"
   const [automationForm, setAutomationForm] = useState({
     name: "",
     type: "time-based",
     enabled: true,
     dateTime: "",
-    repeatSchedule: "none", // new field for repeating schedule
+    timeLength: "",
+    timeUnit: "Second",
+    repeatSchedule: "none",
     sensorField: "temperature",
     operator: ">",
     thresholdValue: "",
-    action: "addWater",
+    action: "turnOnLight",
+    volumeMl: "",
   });
 
-  // Create new automation in Firestore (via dataContext)
+  // Ensure the action is valid for the selected board type
+  useEffect(() => {
+    setAutomationForm((prev) => {
+      const validHpcb = ["turnOnLight", "turnOnFan", "turnOnHumidifier"];
+      const validNscb = ["addWater", "addNutrient1", "addNutrient2"];
+      if (automationBoardType === "HPCB") {
+        if (!validHpcb.includes(prev.action)) {
+          return { ...prev, action: "turnOnLight" };
+        }
+      } else {
+        if (!validNscb.includes(prev.action)) {
+          return { ...prev, action: "addWater" };
+        }
+      }
+      return prev;
+    });
+  }, [automationBoardType]);
+
+  // Create new automation
   const handleCreateAutomation = async () => {
     const payload = {
       ...automationForm,
-      boardType: automationBoardType, // if you still want to store boardType
+      boardType: automationBoardType,
     };
-    const newId = await createAutomation(payload);
+    const newId = await createAutomation(payload, sensors);
     if (newId) {
       setSelectedAutomationId(newId);
     }
-    // Optionally reset form
-    // setAutomationForm({ ...defaults... });
   };
 
-  // Select an existing automation => load into form
+  // Load an existing automation into the form
   const handleSelectAutomation = (e) => {
     const autoId = e.target.value;
     setSelectedAutomationId(autoId);
+
     if (!autoId) {
-      // Reset form to defaults if no selection
+      // Reset form if none selected
+      setAutomationBoardType("HPCB");
       setAutomationForm({
         name: "",
         type: "time-based",
         enabled: true,
         dateTime: "",
+        timeLength: "",
+        timeUnit: "Second",
         repeatSchedule: "none",
         sensorField: "temperature",
         operator: ">",
         thresholdValue: "",
-        action: "addWater",
+        action: "turnOnLight",
+        volumeMl: "",
       });
       return;
     }
-    // Load existing automation from dataContext
+
+    // Populate form with existing automation
     const autoObj = automations.find((a) => a.id === autoId);
     if (autoObj) {
-      setAutomationBoardType(autoObj.boardType || "NSCB");
+      setAutomationBoardType(autoObj.boardType || "HPCB");
       setAutomationForm({
         name: autoObj.name || "",
         type: autoObj.type || "time-based",
         enabled: autoObj.enabled ?? true,
-        dateTime: autoObj.dateTime || "",
-        repeatSchedule: autoObj.repeatSchedule || "none",
+        dateTime: autoObj.timestamp
+          ? autoObj.timestamp.slice(0, 16)
+          : "",
+        timeLength: autoObj.timeLength?.toString() || "",
+        timeUnit: autoObj.timeLengthType || "Second",
+        repeatSchedule: autoObj.repeat || "none",
         sensorField: autoObj.sensorField || "temperature",
         operator: autoObj.operator || ">",
-        thresholdValue: autoObj.thresholdValue?.toString() || "",
-        action: autoObj.action || "addWater",
+        thresholdValue: autoObj.thresholdNumber?.toString() || "",
+        action: autoObj.action || "",
+        volumeMl: autoObj.volume?.toString() || "",
       });
     }
   };
 
-  // Update the selected automation
+  // Update existing automation
   const handleUpdateAutomation = async () => {
     if (!selectedAutomationId) return;
     const payload = {
       ...automationForm,
       boardType: automationBoardType,
     };
-    await updateAutomation(selectedAutomationId, payload);
+    await updateAutomation(selectedAutomationId, payload, sensors);
   };
 
   // Delete the currently selected automation
@@ -227,43 +245,43 @@ function ControlPanel() {
     if (!selectedAutomationId) return;
     await deleteAutomation(selectedAutomationId);
     setSelectedAutomationId("");
+    setAutomationBoardType("HPCB");
     setAutomationForm({
       name: "",
       type: "time-based",
       enabled: true,
       dateTime: "",
+      timeLength: "",
+      timeUnit: "Second",
       repeatSchedule: "none",
       sensorField: "temperature",
       operator: ">",
       thresholdValue: "",
-      action: "addWater",
+      action: "turnOnLight",
+      volumeMl: "",
     });
   };
 
-  // Toggle automation's "enabled" state
-  const handleToggleEnabled = async (autoId, curVal) => {
-    await updateAutomation(autoId, { enabled: !curVal });
+  // NEW: Instead of toggling, we delete the automation from the list
+  const handleDeleteFromList = async (automationId) => {
+    await deleteAutomation(automationId);
   };
 
-  // Clear all automations from Firestore
+  // Clear all automations
   const clearAllAutomationsHandler = async () => {
     await clearAllAutomations();
   };
 
-  // Renders how each automation is shown in the existing list
+  // For display in the dropdown
   function computeAutomationLabel(auto) {
     return `${auto.name} (${auto.type})`;
   }
-
-  // ─────────────────────────────────────────────────────────────
-  //                RENDERING THE COMPONENT
-  // ─────────────────────────────────────────────────────────────
 
   return (
     <div className={styles.content}>
       <h2>Control Panel</h2>
 
-      {/* SENSORS */}
+      {/* SENSOR CONTROL */}
       <div className={styles.controlPanelContainer}>
         <h3>Sensor Control</h3>
 
@@ -276,17 +294,16 @@ function ControlPanel() {
               if (!fieldDefs) return null;
 
               return fieldDefs.map(({ field, label, unit, isBoolean }) => {
-                // "Latest" value from Firestore (read-only)
+                // Latest from Firestore
                 let latestVal = latestData[field];
                 if (typeof latestVal === "undefined" || latestVal === null) {
                   latestVal = isBoolean ? false : "";
                 }
 
-                // Decide how to render the "edited" cell and "Set" cell
                 let editedCell, setCell;
 
                 if (field === "waterLevel") {
-                  // Instead of showing a numeric text box, we show "Fill to 100%" here.
+                  // "Fill to 100%" button
                   editedCell = (
                     <button
                       onClick={handleFillWater}
@@ -295,29 +312,43 @@ function ControlPanel() {
                       Fill to 100%
                     </button>
                   );
-                  // No dedicated "Set" button for water level
-                  setCell = <div />; // empty placeholder
+                  setCell = <div />; // no "Set" for water
                 } else if (isBoolean) {
-                  // Show a checkbox for booleans
+                  // On/Off radio
                   editedCell = (
-                    <label style={{ display: "flex", alignItems: "center" }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editedData[field]}
-                        onChange={(e) =>
-                          setEditedData((prev) => ({
-                            ...prev,
-                            [field]: e.target.checked,
-                          }))
-                        }
-                      />
-                      <span style={{ marginLeft: "6px" }}>
-                        {editedData[field] ? "On" : "Off"}
-                      </span>
-                    </label>
+                    <div style={{ display: "flex", gap: "1rem" }}>
+                      <label>
+                        <input
+                          type="radio"
+                          name={field}
+                          value="on"
+                          checked={editedData[field] === true}
+                          onChange={() =>
+                            setEditedData((prev) => ({
+                              ...prev,
+                              [field]: true,
+                            }))
+                          }
+                        />
+                        On
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name={field}
+                          value="off"
+                          checked={editedData[field] === false}
+                          onChange={() =>
+                            setEditedData((prev) => ({
+                              ...prev,
+                              [field]: false,
+                            }))
+                          }
+                        />
+                        Off
+                      </label>
+                    </div>
                   );
-
-                  // A normal "Set" button for booleans
                   setCell = (
                     <button
                       onClick={() => handleSetSensor(field)}
@@ -327,7 +358,7 @@ function ControlPanel() {
                     </button>
                   );
                 } else {
-                  // Numeric => text box plus "Set" button
+                  // Numeric => text box
                   editedCell = (
                     <input
                       type="number"
@@ -354,11 +385,9 @@ function ControlPanel() {
 
                 return (
                   <React.Fragment key={field}>
-                    {/* LABEL */}
                     <div className={styles.rowLabel}>
                       <strong>{label}:</strong>
                     </div>
-
                     {/* LATEST (read‐only) */}
                     <div className={styles.rowLatest}>
                       {isBoolean ? (
@@ -380,11 +409,9 @@ function ControlPanel() {
                         <span className={styles.unit}>{unit}</span>
                       )}
                     </div>
-
-                    {/* EDITED (checkbox, numeric input, or Fill button) */}
+                    {/* EDITED CELL (radio, numeric, or fill button) */}
                     <div className={styles.rowEdited}>{editedCell}</div>
-
-                    {/* Single "Set" button or empty if water */}
+                    {/* "Set" button (or empty if water) */}
                     <div className={styles.rowSet}>{setCell}</div>
                   </React.Fragment>
                 );
@@ -402,17 +429,18 @@ function ControlPanel() {
         )}
       </div>
 
-      {/* AUTOMATIONS (NEW LOGIC / LAYOUT) */}
+      {/* AUTOMATIONS */}
       <div className={styles.automationContainer}>
         <h3>Automations</h3>
         <p className={styles.automationPurpose}>
           <strong>Purpose of Automation</strong>
           <br />
-          Automations let you perform actions (e.g., add water, turn off lights)
-          automatically based on conditions (time-based or threshold-based).
+          Automations let you perform actions (e.g., add water, turn on fan)
+          automatically based on conditions (time-based, time-length-based, or
+          threshold-based).
         </p>
 
-        {/* Select existing or create new */}
+        {/* Select or Create */}
         <div className={styles.automationTopSelect}>
           <label className={styles.automationSelectLabel}>Saved Automations:</label>
           <select
@@ -429,7 +457,7 @@ function ControlPanel() {
           </select>
         </div>
 
-        {/* Board Type (if you want to keep it) */}
+        {/* Board Type */}
         <div className={styles.automationBoardTypeContainer}>
           <label className={styles.automationSelectLabel}>Board Type:</label>
           <select
@@ -437,15 +465,14 @@ function ControlPanel() {
             onChange={(e) => setAutomationBoardType(e.target.value)}
             className={styles.automationDropdown}
           >
-            <option value="NSCB">NSCB</option>
             <option value="HPCB">HPCB</option>
-            <option value="GSMB">GSMB</option>
+            <option value="NSCB">NSCB</option>
           </select>
         </div>
 
-        {/* Grid with 4 columns and 2 rows (like in the reference) */}
-        <div className={styles.automationGrid4col}>
-          {/* Left column: Name */}
+        {/* 5-column grid: Name / Type / Date-or-Sensor / TimeLength / Action */}
+        <div className={styles.automationGrid5col}>
+          {/* 1) Name */}
           <div className={styles.automationLeft}>
             <label className={styles.automationStep}>Name</label>
             <input
@@ -458,29 +485,27 @@ function ControlPanel() {
             />
           </div>
 
-          {/* Middle: Type */}
+          {/* 2) Type */}
           <div className={styles.automationMiddle}>
             <label className={styles.automationStep}>Type</label>
             <div className={styles.automationSelectBlock}>
               <select
                 value={automationForm.type}
                 onChange={(e) =>
-                  setAutomationForm((prev) => ({
-                    ...prev,
-                    type: e.target.value,
-                  }))
+                  setAutomationForm((prev) => ({ ...prev, type: e.target.value }))
                 }
                 className={styles.automationDropdown}
               >
                 <option value="time-based">Time-Based</option>
+                <option value="time-length-based">Time-Length-Based</option>
                 <option value="threshold-based">Threshold-Based</option>
               </select>
             </div>
           </div>
 
-          {/* Right: If time-based => dateTime, else threshold-based => sensor/operator/threshold */}
+          {/* 3) Date/Time or Sensor Field */}
           <div className={styles.automationRight}>
-            {automationForm.type === "time-based" ? (
+            {automationForm.type === "time-based" && (
               <>
                 <label className={styles.automationLabelMargin}>Date/Time</label>
                 <input
@@ -495,7 +520,38 @@ function ControlPanel() {
                   }
                 />
               </>
-            ) : (
+            )}
+            {automationForm.type === "time-length-based" && (
+              <>
+                <label className={styles.automationLabelMargin}>Time Length</label>
+                <input
+                  type="number"
+                  className={`${styles.automationNameInput} ${styles.automationSelectMargin}`}
+                  value={automationForm.timeLength}
+                  onChange={(e) =>
+                    setAutomationForm((prev) => ({
+                      ...prev,
+                      timeLength: e.target.value,
+                    }))
+                  }
+                />
+                <select
+                  className={`${styles.automationDropdown} ${styles.automationSelectMargin}`}
+                  value={automationForm.timeUnit}
+                  onChange={(e) =>
+                    setAutomationForm((prev) => ({
+                      ...prev,
+                      timeUnit: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="Second">Second</option>
+                  <option value="Minute">Minute</option>
+                  <option value="Hour">Hour</option>
+                </select>
+              </>
+            )}
+            {automationForm.type === "threshold-based" && (
               <>
                 <label className={styles.automationLabelMargin}>
                   Sensor Field
@@ -551,7 +607,45 @@ function ControlPanel() {
             )}
           </div>
 
-          {/* 4th col: Action + create/update/delete */}
+          {/* 4) Time Length column for time-based or threshold-based */}
+          <div className={styles.automationTimeLength}>
+            {(automationForm.type === "time-based" ||
+              automationForm.type === "threshold-based") && (
+              <>
+                <label className={styles.automationLabelMargin}>Time Length</label>
+                <input
+                  type="number"
+                  className={`${styles.automationNameInput} ${styles.automationSelectMargin}`}
+                  value={automationForm.timeLength}
+                  onChange={(e) =>
+                    setAutomationForm((prev) => ({
+                      ...prev,
+                      timeLength: e.target.value,
+                    }))
+                  }
+                />
+                <select
+                  className={`${styles.automationDropdown} ${styles.automationSelectMargin}`}
+                  value={automationForm.timeUnit}
+                  onChange={(e) =>
+                    setAutomationForm((prev) => ({
+                      ...prev,
+                      timeUnit: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="Second">Second</option>
+                  <option value="Minute">Minute</option>
+                  <option value="Hour">Hour</option>
+                </select>
+              </>
+            )}
+            {automationForm.type === "time-length-based" && (
+              <p style={{ marginTop: "26px" }}>N/A (already set)</p>
+            )}
+          </div>
+
+          {/* 5) Action */}
           <div className={styles.automationSaved}>
             <label>Action</label>
             <select
@@ -564,46 +658,46 @@ function ControlPanel() {
                 }))
               }
             >
-              {/* Adjust these to your desired actions or keep the reference's */}
-              <option value="addWater">Add Water</option>
-              <option value="drainWater">Drain Water</option>
-              <option value="addNutrients">Add Nutrients</option>
-              <option value="turnOnLights">Turn On Lights</option>
-              <option value="turnOffLights">Turn Off Lights</option>
-            </select>
-
-            <div className={styles.automationActionButtonsContainer}>
-              {!selectedAutomationId && (
-                <button
-                  onClick={handleCreateAutomation}
-                  className={`${styles.setButton} ${styles.automationSpaceRight}`}
-                >
-                  Create
-                </button>
-              )}
-              {selectedAutomationId && (
+              {automationBoardType === "HPCB" && (
                 <>
-                  <button
-                    onClick={handleUpdateAutomation}
-                    className={`${styles.setButton} ${styles.automationSpaceRight}`}
-                  >
-                    Update
-                  </button>
-                  <button
-                    onClick={handleDeleteSelected}
-                    className={styles.setButton}
-                  >
-                    Delete
-                  </button>
+                  <option value="turnOnLight">Turn On Light</option>
+                  <option value="turnOnFan">Turn On Fan</option>
+                  <option value="turnOnHumidifier">Turn On Humidifier</option>
                 </>
               )}
-            </div>
+              {automationBoardType === "NSCB" && (
+                <>
+                  <option value="addWater">Add Water</option>
+                  <option value="addNutrient1">Add Nutrient 1</option>
+                  <option value="addNutrient2">Add Nutrient 2</option>
+                </>
+              )}
+            </select>
+
+            {/* If NSCB & no selection => show volume input below Action */}
+            {automationBoardType === "NSCB" && !selectedAutomationId && (
+              <>
+                <label style={{ marginTop: "10px" }}>Volume (mL)</label>
+                <input
+                  type="number"
+                  style={{ marginTop: "5px" }}
+                  className={styles.automationNameInput}
+                  value={automationForm.volumeMl}
+                  onChange={(e) =>
+                    setAutomationForm((prev) => ({
+                      ...prev,
+                      volumeMl: e.target.value,
+                    }))
+                  }
+                />
+              </>
+            )}
           </div>
 
-          {/* Empty left cell below */}
+          {/* SECOND ROW */}
           <div className={styles.automationLeftEmpty}></div>
 
-          {/* Middle cell: Enabled checkbox */}
+          {/* Enabled? */}
           <div className={styles.automationMiddleEnabled}>
             <label className={styles.automationEnabledLabel}>Enabled?</label>
             <input
@@ -618,7 +712,7 @@ function ControlPanel() {
             />
           </div>
 
-          {/* Right cell: Repeat schedule if time-based */}
+          {/* Repeat (time-based only) */}
           <div className={styles.automationRightRepeat}>
             {automationForm.type === "time-based" && (
               <>
@@ -640,10 +734,41 @@ function ControlPanel() {
               </>
             )}
           </div>
-          <div className={styles.automationSavedEmpty}></div>
+
+          <div className={styles.automationTimeEmpty}></div>
+
+          {/* CREATE / UPDATE / DELETE */}
+          <div className={styles.automationSavedEmpty}>
+            {/* If NO selectedAutomationId => show Create */}
+            {!selectedAutomationId && (
+              <button
+                onClick={handleCreateAutomation}
+                className={styles.setButton}
+              >
+                Create
+              </button>
+            )}
+            {/* If an automation IS selected => show Update/Delete */}
+            {selectedAutomationId && (
+              <>
+                <button
+                  onClick={handleUpdateAutomation}
+                  className={`${styles.setButton} ${styles.automationSpaceRight}`}
+                >
+                  Update
+                </button>
+                <button
+                  onClick={handleDeleteSelected}
+                  className={styles.setButton}
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Existing automations listing */}
+        {/* Existing Automations */}
         <div className={styles.automationExistingList}>
           <h4>Existing Automations</h4>
           {!automations.length ? (
@@ -652,15 +777,16 @@ function ControlPanel() {
             automations.map((auto) => (
               <div key={auto.id} className={styles.automationItemRow}>
                 <div>
-                  <strong>{auto.name}</strong> – {auto.type} – {auto.action} –
-                  {auto.enabled ? " (Enabled)" : " (Disabled)"}
+                  <strong>{auto.name}</strong> – {auto.type} – {auto.action} –{" "}
+                  {auto.enabled ? "(Enabled)" : "(Disabled)"}
                 </div>
                 <div>
+                  {/* REPLACED “Toggle” WITH “Delete” */}
                   <button
-                    onClick={() => handleToggleEnabled(auto.id, auto.enabled)}
+                    onClick={() => handleDeleteFromList(auto.id)}
                     className={styles.automationToggleButton}
                   >
-                    Toggle
+                    Delete
                   </button>
                 </div>
               </div>
@@ -675,7 +801,6 @@ function ControlPanel() {
           Clear All Automations
         </button>
       </div>
-      {/* End of updated Automations container */}
     </div>
   );
 }

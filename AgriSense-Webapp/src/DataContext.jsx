@@ -57,7 +57,6 @@ const initialDataState = {
     humidifier3State: false,
 
     waterLevel: "",
-
     nutrient1: "",
     nutrient2: "",
 
@@ -226,7 +225,11 @@ export const DataProvider = ({ children }) => {
         ];
 
         sensorFields.forEach((field) => {
-          if (field.value !== undefined && field.value !== null && field.value !== "") {
+          if (
+            field.value !== undefined &&
+            field.value !== null &&
+            field.value !== ""
+          ) {
             lines.push({
               boardType,
               time: timeObj,
@@ -256,10 +259,11 @@ export const DataProvider = ({ children }) => {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  4) CREATE NEW READING (Copy-latest approach)
-  //      *** UPDATED to handle numeric light1, light2, light3 ***
+  //  4) CREATE NEW READING (existing logic)
   // ─────────────────────────────────────────────────────────────
   async function createNewReading(fieldsToUpdate, activeSensors) {
+    // (no change)
+    // ...
     const boardsNeeded = new Set();
     activeSensors.forEach((sensorName) => {
       const lower = sensorName.toLowerCase();
@@ -387,10 +391,16 @@ export const DataProvider = ({ children }) => {
         if (activeSensors.includes("Water Level") && fieldsToUpdate.hasOwnProperty("waterLevel")) {
           docData.waterLevel = parseFloat(fieldsToUpdate.waterLevel) || 0;
         }
-        if (activeSensors.includes("Nutrient 1 Level") && fieldsToUpdate.hasOwnProperty("nutrient1")) {
+        if (
+          activeSensors.includes("Nutrient 1 Level") &&
+          fieldsToUpdate.hasOwnProperty("nutrient1")
+        ) {
           docData.nutrient1 = parseFloat(fieldsToUpdate.nutrient1) || 0;
         }
-        if (activeSensors.includes("Nutrient 2 Level") && fieldsToUpdate.hasOwnProperty("nutrient2")) {
+        if (
+          activeSensors.includes("Nutrient 2 Level") &&
+          fieldsToUpdate.hasOwnProperty("nutrient2")
+        ) {
           docData.nutrient2 = parseFloat(fieldsToUpdate.nutrient2) || 0;
         }
       }
@@ -403,15 +413,176 @@ export const DataProvider = ({ children }) => {
     }
   }
 
-  // AUTOMATIONS
-  async function createAutomation(payload) { /* ... or omitted ... */ }
-  async function updateAutomation(id, payload) { /* ... or omitted ... */ }
-  async function deleteAutomation(id) { /* ... or omitted ... */ }
-  async function clearAllAutomations() { /* ... or omitted ... */ }
+  // ─────────────────────────────────────────────────────────────
+  //  AUTOMATIONS: CREATE, UPDATE, DELETE, CLEAR
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Utility: figure out a "portNumber" based on the action and the activeSensors.
+   * For example, if action is "turnOnLight" and the user has "Light 2" in activeSensors,
+   * then portNumber = 2, etc.
+   */
+  function getPortNumberForAction(action, instanceSensors) {
+    // action values for HPCB are: "turnOnLight", "turnOnFan", "turnOnHumidifier"
+    // We check which slot the user has (Light 1, Light 2, Light 3, etc.)
+    if (action === "turnOnLight") {
+      if (instanceSensors.includes("Light 1")) return 1;
+      if (instanceSensors.includes("Light 2")) return 2;
+      if (instanceSensors.includes("Light 3")) return 3;
+    } else if (action === "turnOnFan") {
+      if (instanceSensors.includes("Fan 1")) return 1;
+      if (instanceSensors.includes("Fan 2")) return 2;
+      if (instanceSensors.includes("Fan 3")) return 3;
+    } else if (action === "turnOnHumidifier") {
+      if (instanceSensors.includes("Humidifier 1")) return 1;
+      if (instanceSensors.includes("Humidifier 2")) return 2;
+      if (instanceSensors.includes("Humidifier 3")) return 3;
+    }
+    // If not found, or no matching sensor, return null
+    return null;
+  }
+
+  /**
+   * Create an automation document in Firestore with all required fields.
+   */
+  async function createAutomation(payload, instanceSensors) {
+    try {
+      const docData = buildAutomationDocData(payload, instanceSensors);
+      const colRef = collection(db, "automations");
+      const docRef = await addDoc(colRef, docData);
+      return docRef.id;
+    } catch (error) {
+      console.error("Error creating automation:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing automation document by ID.
+   */
+  async function updateAutomation(id, payload, instanceSensors) {
+    try {
+      const docData = buildAutomationDocData(payload, instanceSensors);
+      const docRef = doc(db, "automations", id);
+      await updateDoc(docRef, docData);
+    } catch (error) {
+      console.error("Error updating automation:", error);
+    }
+  }
+
+  /**
+   * Delete an automation document by ID.
+   */
+  async function deleteAutomation(id) {
+    try {
+      const docRef = doc(db, "automations", id);
+      await deleteDoc(docRef);
+    } catch (error) {
+      console.error("Error deleting automation:", error);
+    }
+  }
+
+  /**
+   * Clear all documents in the "automations" collection.
+   */
+  async function clearAllAutomations() {
+    try {
+      const colRef = collection(db, "automations");
+      const snapshot = await getDocs(colRef);
+      const batchDeletes = [];
+      snapshot.forEach((docSnap) => {
+        batchDeletes.push(deleteDoc(doc(db, "automations", docSnap.id)));
+      });
+      await Promise.all(batchDeletes);
+    } catch (error) {
+      console.error("Error clearing all automations:", error);
+    }
+  }
+
+  /**
+   * A helper that constructs the Firestore doc for an automation
+   * based on boardType & type. Adheres to the required fields:
+   *
+   * - For HPCB:
+   *   • Time-Based:        boardType, name, type, timestamp, timeLength, timeLengthType, action, enabled, repeat, portNumber
+   *   • Time-Length-Based: boardType, name, type, timeLength, timeLengthType, action, enabled, repeat, portNumber
+   *   • Threshold-Based:   boardType, name, type, sensorField, operator, thresholdNumber, timeLength, timeLengthType, action, enabled, repeat, portNumber
+   *
+   * - For NSCB:
+   *   • Time-Based:        boardType, name, type, timestamp, timeLength, timeLengthType, action, enabled, repeat, volume
+   *   • Time-Length-Based: boardType, name, type, timeLength, timeLengthType, action, enabled, repeat, volume
+   *   • Threshold-Based:   boardType, name, type, sensorField, operator, thresholdNumber, timeLength, timeLengthType, action, enabled, repeat, volume
+   */
+  function buildAutomationDocData(payload, instanceSensors) {
+    const {
+      boardType,        // "HPCB" or "NSCB"
+      name,
+      type,             // "time-based", "time-length-based", "threshold-based"
+      dateTime,         // string (datetime-local) if time-based
+      timeLength,       // numeric string
+      timeUnit,         // e.g. "Second", "Minute", "Hour"
+      sensorField,      // e.g. "temperature", if threshold-based
+      operator,         // e.g. ">", "<", "="
+      thresholdValue,   // e.g. "30"
+      action,           // e.g. "turnOnLight" or "addWater"
+      enabled,          // boolean
+      repeatSchedule,   // e.g. "none", "daily", "weekly"
+      volumeMl,         // for NSCB only
+    } = payload;
+
+    const docData = {
+      boardType,
+      name: name || "",
+      type,
+      enabled: enabled ?? true,
+      repeat: repeatSchedule || "none",
+      action,
+    };
+
+    // Common fields for "time-based" or "threshold-based" => we store timeLength/timeLengthType
+    // but note "time-length-based" also uses timeLength/timeLengthType. 
+    // We'll handle each type with conditionals:
+
+    if (type === "time-based") {
+      // time-based => we store a 'timestamp' (from dateTime), plus timeLength/timeLengthType
+      docData.timestamp = dateTime
+        ? new Date(dateTime).toISOString()
+        : getTimestampString(); // fallback if none
+      // Also store the timeLength/timeLengthType (if needed)
+      docData.timeLength = parseInt(timeLength) || 0;
+      docData.timeLengthType = timeUnit || "Second";
+    } else if (type === "time-length-based") {
+      // time-length-based => no timestamp, but has timeLength/timeLengthType
+      docData.timeLength = parseInt(timeLength) || 0;
+      docData.timeLengthType = timeUnit || "Second";
+    } else if (type === "threshold-based") {
+      docData.sensorField = sensorField || "";
+      docData.operator = operator || ">";
+      docData.thresholdNumber = parseFloat(thresholdValue) || 0;
+      docData.timeLength = parseInt(timeLength) || 0;
+      docData.timeLengthType = timeUnit || "Second";
+    }
+
+    // Next, handle boardType-specific fields
+    if (boardType === "HPCB") {
+      // We figure out portNumber from the action + instanceSensors
+      const portNumber = getPortNumberForAction(action, instanceSensors);
+      docData.portNumber = portNumber !== null ? portNumber : 0; 
+    } else if (boardType === "NSCB") {
+      // We store "volume"
+      docData.volume = parseFloat(volumeMl) || 0;
+    }
+
+    return docData;
+  }
 
   // LOGS
-  async function importLogs(jsonItems, activeSensors) { /* ... or omitted ... */ }
-  async function clearLogs(activeSensors) { /* ... or omitted ... */ }
+  async function importLogs(jsonItems, activeSensors) {
+    // Implementation omitted or optional
+  }
+  async function clearLogs(activeSensors) {
+    // Implementation omitted or optional
+  }
 
   const value = {
     dataState,
