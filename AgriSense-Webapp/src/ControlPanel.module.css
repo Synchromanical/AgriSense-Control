@@ -72,6 +72,17 @@
   font-size: 1rem;
 }
 
+.setWaterButton {
+  padding: 5px 10px;
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 30px;
+}
+
 .setButton:hover {
   background-color: #8ecae6;
   color: #2d2d44;
@@ -188,8 +199,22 @@
   width: 150px;
 }
 
+.automationVolumeInput {
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+  margin-top: 19px;
+  width: 150px;
+}
+
 .automationLabelMargin {
   margin-top: 0rem;
+}
+
+.automationLabelField {
+  margin-top: 10px;
 }
 
 .automationDropdown {
@@ -198,7 +223,6 @@
   border: 1px solid #8ecae6;
   background-color: #1e1e2f;
   color: #ffffff;
-  margin-right: 5px;
   margin-top: 27px;
 }
 
@@ -212,7 +236,12 @@
 }
 
 .automationSelectMargin {
-  margin-top: 0.5rem;
+  margin-top: 27px;
+  margin-left: 5px;
+}
+
+.automationSelectMarginField {
+  margin-top: 5px;
 }
 
 .automationActionButtonsContainer {
@@ -249,6 +278,13 @@
 }
 
 .automationToggleButton {
+  padding: 5px 10px;
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1rem;
   margin-right: 10px;
 }
 

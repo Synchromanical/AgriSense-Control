@@ -184,9 +184,6 @@ function Graph() {
               {sensorName}
             </option>
           ))}
-          {/* If you prefer to also have a "blank" option, you could do:
-            <option value="">-- None --</option>
-          */}
         </select>
       </div>
 

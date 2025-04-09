@@ -25,7 +25,6 @@ const Dashboard = () => {
     "Fan 1": [{ label: "Fan 1 State", field: "fan1State", isBoolean: true }],
     "Fan 2": [{ label: "Fan 2 State", field: "fan2State", isBoolean: true }],
     "Fan 3": [{ label: "Fan 3 State", field: "fan3State", isBoolean: true }],
-
     "Light 1": [
       { label: "Light 1", field: "light1", unit: "lux" },
       { label: "Light 1 State", field: "light1State", isBoolean: true },
@@ -38,7 +37,6 @@ const Dashboard = () => {
       { label: "Light 3", field: "light3", unit: "lux" },
       { label: "Light 3 State", field: "light3State", isBoolean: true },
     ],
-
     "Humidifier 1": [
       { label: "Humidifier 1 State", field: "humidifier1State", isBoolean: true },
     ],
@@ -48,7 +46,6 @@ const Dashboard = () => {
     "Humidifier 3": [
       { label: "Humidifier 3 State", field: "humidifier3State", isBoolean: true },
     ],
-
     "Water Level": [
       { label: "Water Level", field: "waterLevel", unit: "%" },
     ],
@@ -83,7 +80,6 @@ const Dashboard = () => {
           <div className={styles.sensorData}>
             <h3>Latest Sensor Data</h3>
 
-            {/* NEW: Two-column grid for the sensor labels/values */}
             <div className={styles.latestSensorGrid}>
               {sensors.map((sensorName) => {
                 const fieldDefs = sensorMapping[sensorName];
@@ -91,17 +87,12 @@ const Dashboard = () => {
 
                 return fieldDefs.map((def) => {
                   const rawValue = latestData[def.field];
-
                   return (
                     <React.Fragment key={`${sensorName}-${def.field}`}>
-                      {/* First column: Label */}
                       <div className={styles.latestLabel}>
                         <strong>{def.label}:</strong>
                       </div>
-
-                      {/* Second column: Value */}
                       <div className={styles.latestValue}>
-                        {/* Boolean => show On/Off text; numeric => show number */}
                         {def.isBoolean ? (
                           <input
                             type="text"

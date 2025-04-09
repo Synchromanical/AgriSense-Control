@@ -262,8 +262,6 @@ export const DataProvider = ({ children }) => {
   //  4) CREATE NEW READING (existing logic)
   // ─────────────────────────────────────────────────────────────
   async function createNewReading(fieldsToUpdate, activeSensors) {
-    // (no change)
-    // ...
     const boardsNeeded = new Set();
     activeSensors.forEach((sensorName) => {
       const lower = sensorName.toLowerCase();
@@ -442,6 +440,14 @@ export const DataProvider = ({ children }) => {
     return null;
   }
 
+  // ADDED: helper to map boardType => numeric node
+  function getNodeNumberForBoardType(boardType) {
+    if (boardType === "GSMB") return 1;
+    if (boardType === "HPCB") return 2;
+    if (boardType === "NSCB") return 3;
+    return 0;
+  }
+
   /**
    * Create an automation document in Firestore with all required fields.
    */
@@ -515,19 +521,22 @@ export const DataProvider = ({ children }) => {
    */
   function buildAutomationDocData(payload, instanceSensors) {
     const {
-      boardType,        // "HPCB" or "NSCB"
+      boardType,
       name,
-      type,             // "time-based", "time-length-based", "threshold-based"
-      dateTime,         // string (datetime-local) if time-based
-      timeLength,       // numeric string
-      timeUnit,         // e.g. "Second", "Minute", "Hour"
-      sensorField,      // e.g. "temperature", if threshold-based
-      operator,         // e.g. ">", "<", "="
-      thresholdValue,   // e.g. "30"
-      action,           // e.g. "turnOnLight" or "addWater"
-      enabled,          // boolean
-      repeatSchedule,   // e.g. "none", "daily", "weekly"
-      volumeMl,         // for NSCB only
+      type,
+      dateTime,
+      timeLength,
+      timeUnit,
+      sensorField,
+      operator,
+      thresholdValue,
+      action,
+      enabled,
+      repeatSchedule,
+      volumeMl,
+
+      // ADDED: instanceNumber passed in from ControlPanel
+      instanceNumber,
     } = payload;
 
     const docData = {
@@ -539,20 +548,18 @@ export const DataProvider = ({ children }) => {
       action,
     };
 
-    // Common fields for "time-based" or "threshold-based" => we store timeLength/timeLengthType
-    // but note "time-length-based" also uses timeLength/timeLengthType. 
-    // We'll handle each type with conditionals:
+    // ADDED: instanceNumber and nodeNumber
+    docData.instanceNumber = parseInt(instanceNumber) || 1;
+    docData.nodeNumber = getNodeNumberForBoardType(boardType);
 
+    // For time-based or threshold-based => we store timeLength/timeLengthType if relevant
     if (type === "time-based") {
-      // time-based => we store a 'timestamp' (from dateTime), plus timeLength/timeLengthType
       docData.timestamp = dateTime
         ? new Date(dateTime).toISOString()
         : getTimestampString(); // fallback if none
-      // Also store the timeLength/timeLengthType (if needed)
       docData.timeLength = parseInt(timeLength) || 0;
       docData.timeLengthType = timeUnit || "Second";
     } else if (type === "time-length-based") {
-      // time-length-based => no timestamp, but has timeLength/timeLengthType
       docData.timeLength = parseInt(timeLength) || 0;
       docData.timeLengthType = timeUnit || "Second";
     } else if (type === "threshold-based") {
@@ -565,11 +572,9 @@ export const DataProvider = ({ children }) => {
 
     // Next, handle boardType-specific fields
     if (boardType === "HPCB") {
-      // We figure out portNumber from the action + instanceSensors
       const portNumber = getPortNumberForAction(action, instanceSensors);
-      docData.portNumber = portNumber !== null ? portNumber : 0; 
+      docData.portNumber = portNumber !== null ? portNumber : 0;
     } else if (boardType === "NSCB") {
-      // We store "volume"
       docData.volume = parseFloat(volumeMl) || 0;
     }
 
