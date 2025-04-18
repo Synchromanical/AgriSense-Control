@@ -1,8 +1,3 @@
-/* Dashboard.module.css */
-
-/* Optional: replicate the .content style if desired. 
-   (You may have removed it if using your App.module.css container.)
-*/
 .content {
   padding-top: 25px;
   max-width: 1200px;
@@ -14,7 +9,6 @@
   width: 100%;
 }
 
-/* The main container that holds sensor info + logs (left/right) */
 .dashboardContainer {
   display: flex;
   gap: 150px;
@@ -30,46 +24,28 @@
   border-radius: 10px;
   padding: 25px;
   width: 120%;
-  max-width: 600px;
   text-align: center;
   margin-top: 20px;
 }
 
-.sensorData p {
-  font-size: 1.2rem;
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.sensorData p:last-child {
-  border-bottom: none;
-}
-
-/* Row for sensor fields: two-column grid */
-.sensorRow {
-  margin-top: 15px;
-  margin-bottom: 25px;
-  margin-left: 20px;
+/* NEW: 2-column grid for latest sensor data */
+.latestSensorGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
+  grid-template-columns: 200px 1fr; /* label col, value col */
+  column-gap: 20px;
+  row-gap: 10px;
+  margin-top: 20px;
 }
 
-/* Left column: label */
-.sensorLabel {
-  text-align: center;
+.latestLabel {
+  text-align: right;
   padding-right: 10px;
 }
 
-/* Right column: input container */
-.sensorInputContainer {
+.latestValue {
   display: flex;
   align-items: center;
-}
-
-/* Optional spacing for unit text */
-.sensorInputContainer span {
-  margin-left: 5px;
+  gap: 5px;
 }
 
 .sensorInput {
@@ -79,17 +55,9 @@
   text-align: center;
 }
 
-.radioGroup {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 10px;
-  /* Adjust left margin if needed for alignment */
-  margin-left: -10px;
-}
-
-.radioGroup input[type="radio"] {
-  margin-right: 5px;
+.unit {
+  font-size: 0.9rem;
+  color: #bbb;
 }
 
 /* Right side logs preview */
@@ -98,9 +66,9 @@
   border-radius: 8px;
   padding: 15px;
   background-color: #2d2d44;
-  height: 330px;
   margin-top: 22px;
   text-align: center;
+  max-height: 315px;
 }
 
 .logsTable {
@@ -124,18 +92,18 @@
   font-size: 0.9rem;
 }
 
-/* Upcoming Automations section */
+/* Automations section */
 .dashboardAutomationsContainer {
   background-color: #2d2d44;
   border-radius: 8px;
   padding: 15px;
-  margin-top: 22px;
+  margin-top: 60px;
+  margin-bottom: 50px;
   text-align: center;
   width: 100%;
-  max-width: 900px;
+  max-width: 1030px;
 }
 
-/* Table for upcoming automations */
 .upcomingAutomationsTable {
   width: 100%;
   border-collapse: collapse;
@@ -152,7 +120,6 @@
 
 .upcomingAutomationsTable th {
   background: #3a3a55;
-  color: #8ecae6;
 }
 
 .upcomingAutomationsTable tr:hover {

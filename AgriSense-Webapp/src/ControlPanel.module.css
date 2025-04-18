@@ -2,249 +2,297 @@
 
 /* Optional: replicate .content style */
 .content {
-    padding-top: 25px; 
-    max-width: 1200px;
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-  }
-  
-  /* Sensor control area */
-  .controlPanelContainer {
-    max-width: 1000px;
-    margin: 2rem auto;
-    background-color: #2d2d44;
-    border-radius: 8px;
-    height: 500px;
-    padding: 25px;
-    margin-top: 22px;
-    text-align: center;
-  }
-  
-  .controlPanelGrid {
-    display: grid;
-    grid-template-columns: 1.5fr 2fr 2fr auto;
-    column-gap: 1rem;
-    row-gap: 1rem;
-    align-items: center;
-    margin-top: 10px;
-  }
-  
-  .rowLabel {
-    text-align: right;
-    font-size: 1rem;
-  }
-  
-  .rowLatest,
-  .rowEdited {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .rowSet {
-    display: flex;
-    justify-content: center;
-  }
-  
-  .unit {
-    font-size: 0.9rem;
-    color: #bbb;
-  }
-  
-  .setButton {
-    padding: 5px 10px;
-    border: 1px solid #8ecae6;
-    border-radius: 4px;
-    background-color: #2d2d44;
-    color: #ffffff;
-    cursor: pointer;
-    font-size: 1rem;
-  }
-  
-  .setButton:hover {
-    background-color: #8ecae6;
-    color: #2d2d44;
-  }
-  
-  .headingCol {
-    text-align: center;
-    font-weight: bold;
-    font-size: 1.1rem;
-    margin-right: 70px;
-  }
-  
-  /* Automation container */
-  .automationContainer {
-    max-width: 1200px;
-    margin: 2rem auto;
-    padding: 2rem;
-    background-color: #2d2d44;
-    border-radius: 8px;
-    text-align: center;
-  }
-  
-  .automationPurpose {
-    text-align: center;
-    margin-bottom: 1rem;
-  }
-  
-  .automationTopSelect {
-    margin-bottom: 1rem;
-  }
-  
-  .automationSelectLabel {
-    margin-right: 10px;
-  }
-  
-  /* 2-row, 4-col grid */
-  .automationGrid4col {
-    display: grid;
-    grid-template-columns: 2fr 2fr 2fr 2fr;
-    grid-template-rows: auto auto;
-    column-gap: 1rem;
-    row-gap: 1rem;
-    align-items: start;
-    margin-top: 10px;
-  }
-  
-  .automationLeft,
-  .automationMiddle,
-  .automationRight,
-  .automationSaved {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  /* 2nd row placeholders */
-  .automationLeftEmpty {
-  }
-  .automationSavedEmpty {
-  }
-  
-  /* Middle + Right in 2nd row for "Enabled?" and "Repeat" */
-  .automationMiddleEnabled {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 3px;
-  }
-  
-  .automationRightRepeat {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-content: center;
-  }
-  
-  .automationEnabledLabel {
-    margin-right: 10px;
-    margin-bottom: 0px;
-  }
-  
-  .automationRepeatLabel {
-    margin-right: 5px;
-  }
-  
-  /* Common steps */
-  .automationStep {
-    margin-bottom: 0.5rem;
-    margin-left: 5px;
-  }
-  
-  .automationSelectBlock {
-    margin-top: -8px;
-  }
-  
-  .automationNameInput {
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid #8ecae6;
-    background-color: #1e1e2f;
-    color: #ffffff;
-    margin-left: 10px;
-    margin-top: 19px;
-    width: 150px;
-  }
-  
-  /* threshold-based fields */
-  .automationLabelMargin {
-    margin-top: 0rem;
-  }
-  
-  .automationDropdown {
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid #8ecae6;
-    background-color: #1e1e2f;
-    color: #ffffff;
-    margin-right: 5px;
-    margin-top: 27px;
-  }
-  
-  .automationDropdownTime {
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid #8ecae6;
-    background-color: #1e1e2f;
-    color: #ffffff;
-    margin-bottom: 0px;
-  }
-  
-  .automationSelectMargin {
-    margin-top: 0.5rem;
-  }
-  
-  .automationActionButtonsContainer {
-    margin-top: 2rem;
-  }
-  
-  .automationSpaceRight {
-    margin-right: 5px;
-  }
-  
-  /* text field for date/time */
-  .automationDatetimeInput {
-    margin-top: 26px;
-    margin-left: 5px;
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid #8ecae6;
-    background-color: #1e1e2f;
-    color: #ffffff;
-  }
-  
-  /* listing of existing automations */
-  .automationExistingList {
-    margin-top: 1rem;
-    text-align: left;
-  }
-  
-  .automationItemRow {
-    display: flex;
-    justify-content: space-between;
-    background: #3a3a55;
-    padding: 8px;
-    margin-bottom: 5px;
-    border-radius: 4px;
-  }
-  
-  .automationToggleButton {
-    margin-right: 10px;
-  }
-  
-  .automationClearButton {
-    margin-top: 1rem;
-  }
-  
-  /* Additional radio label spacing */
-  .automationRadioLabel {
-    margin-right: 1rem;
-    margin-top: 0.5rem;
-  }
-  
+  padding-top: 25px; 
+  max-width: 1200px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+/* Sensor control area */
+.controlPanelContainer {
+  max-width: 1000px;
+  margin: 2rem auto;
+  background-color: #2d2d44;
+  border-radius: 8px;
+  padding: 25px;
+  margin-top: 22px;
+  text-align: center;
+  /* Removed fixed height for dynamic sizing */
+}
+
+.controlPanelGrid {
+  display: grid;
+  grid-template-columns: 1.5fr 2fr 2fr auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.rowLabel {
+  text-align: right;
+  font-size: 1rem;
+}
+
+.rowLatest,
+.rowEdited {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rowButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 40px;
+}
+
+.rowSet {
+  display: flex;
+  justify-content: center;
+}
+
+.unit {
+  font-size: 0.9rem;
+  color: #bbb;
+}
+
+.setButton {
+  padding: 5px 10px;
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.setWaterButton {
+  padding: 5px 10px;
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 30px;
+}
+
+.setButton:hover {
+  background-color: #8ecae6;
+  color: #2d2d44;
+}
+
+.headingCol {
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-right: 70px;
+}
+
+/* Automation container */
+.automationContainer {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: #2d2d44;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.automationPurpose {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.automationTopSelect {
+  margin-bottom: 1rem;
+}
+
+.automationSelectLabel {
+  margin-right: 10px;
+}
+
+/* 5-column grid (instead of the old 4-column) */
+.automationGrid5col {
+  display: grid;
+  /* Now 5 columns: Name | Type | Date/Time-or-Sensor | Time Length | Action */
+  grid-template-columns: 2fr 2fr 2fr 2fr 2fr;
+  grid-template-rows: auto auto;
+  column-gap: 1rem;
+  row-gap: 1rem;
+  align-items: start;
+  margin-top: 30px;
+}
+
+/* The newly inserted 4th column for Time Length 
+   (only appears for time-based & threshold-based in the JS logic) */
+.automationTimeLength {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The rest is unchanged but included for context: */
+
+.automationLeft,
+.automationMiddle,
+.automationRight,
+.automationSaved {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* second-row placeholders */
+.automationLeftEmpty {
+}
+.automationSavedEmpty {
+}
+
+.automationMiddleEnabled {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 3px;
+}
+
+.automationRightRepeat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+.automationEnabledLabel {
+  margin-right: 10px;
+  margin-bottom: 0px;
+}
+
+.automationRepeatLabel {
+  margin-right: 5px;
+}
+
+.automationStep {
+  margin-bottom: 0.5rem;
+  margin-left: 5px;
+}
+
+.automationSelectBlock {
+  margin-top: -8px;
+}
+
+.automationNameInput {
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+  margin-left: 10px;
+  margin-top: 19px;
+  width: 150px;
+}
+
+.automationVolumeInput {
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+  margin-top: 19px;
+  width: 150px;
+}
+
+.automationLabelMargin {
+  margin-top: 0rem;
+}
+
+.automationLabelField {
+  margin-top: 10px;
+}
+
+.automationDropdown {
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+  margin-top: 27px;
+}
+
+.automationDropdownTime {
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+  margin-bottom: 0px;
+}
+
+.automationSelectMargin {
+  margin-top: 27px;
+  margin-left: 5px;
+}
+
+.automationSelectMarginField {
+  margin-top: 5px;
+}
+
+.automationActionButtonsContainer {
+  margin-top: 2rem;
+}
+
+.automationSpaceRight {
+  margin-right: 5px;
+}
+
+.automationDatetimeInput {
+  margin-top: 26px;
+  margin-left: 5px;
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #8ecae6;
+  background-color: #1e1e2f;
+  color: #ffffff;
+}
+
+/* Existing list of automations */
+.automationExistingList {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.automationItemRow {
+  display: flex;
+  justify-content: space-between;
+  background: #3a3a55;
+  padding: 8px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+}
+
+.automationToggleButton {
+  padding: 5px 10px;
+  border: 1px solid #8ecae6;
+  border-radius: 4px;
+  background-color: #2d2d44;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-right: 10px;
+}
+
+.automationClearButton {
+  margin-top: 1rem;
+}
+
+.automationRadioLabel {
+  margin-right: 1rem;
+  margin-top: 0.5rem;
+}

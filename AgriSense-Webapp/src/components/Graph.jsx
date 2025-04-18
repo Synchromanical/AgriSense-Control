@@ -1,208 +1,205 @@
-// src/components/Graph.jsx
-import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+// Graph.jsx
+import React, { useState, useContext, useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
-
 import styles from "../Graph.module.css";
+import { SensorContext } from "../SensorContext";
+import { useDataContext } from "../DataContext";
 
-const Graph = () => {
-  const [sensorData, setSensorData] = useState([]);
-  const [selectedField, setSelectedField] = useState("all");
+// Map sensor names to their numeric Firestore field
+const numericFieldMap = {
+  "Temperature": "temperature",
+  "Humidity": "humidity",
+  "Soil Moisture": "soilMoisture",
+  "Light 1": "light1",
+  "Light 2": "light2",
+  "Light 3": "light3",
+  "Water Level": "waterLevel",
+  "Nutrient 1 Level": "nutrient1",
+  "Nutrient 2 Level": "nutrient2",
+};
 
-  useEffect(() => {
-    const q = query(collection(db, "sensorData"), orderBy("timestamp", "asc"));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          timestamp: data.timestamp,
-          temperature: data.temperature,
-          humidity: data.humidity,
-          soilMoisture: data.soilMoisture,
-          light: data.light,
-        };
-      });
-      setSensorData(docs);
+function Graph() {
+  const { activeSensors, selectedInstance } = useContext(SensorContext);
+  const { dataState } = useDataContext();
+
+  // Active sensors for this instance
+  const sensors = activeSensors[selectedInstance] || [];
+
+  // Filter only those sensors that correspond to a numeric field
+  const numericSensors = sensors.filter((s) => numericFieldMap[s]);
+
+  // By default, show "All Variables"
+  const [selectedSensor, setSelectedSensor] = useState("allSensors");
+
+  // The arrays of docs for each board
+  const gsmDocs = dataState.gsmReadings;
+  const hpcbDocs = dataState.hpcbReadings;
+  const nscbDocs = dataState.nscbReadings;
+
+  // Merge them to build a union of all timestamps (sorted ascending)
+  const merged = useMemo(() => {
+    return [...gsmDocs, ...hpcbDocs, ...nscbDocs].sort(
+      (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+    );
+  }, [gsmDocs, hpcbDocs, nscbDocs]);
+
+  // Build a sorted list of unique timestamps
+  const unionTimestamps = useMemo(() => {
+    const setOfT = new Set();
+    merged.forEach((d) => {
+      if (d.timestamp) {
+        setOfT.add(new Date(d.timestamp).getTime());
+      }
     });
+    return Array.from(setOfT)
+      .sort((a, b) => a - b)
+      .map((t) => new Date(t));
+  }, [merged]);
 
-    return () => unsub();
-  }, []);
-
-  // Build arrays
-  const timestamps = [];
-  const humidityData = [];
-  const temperatureData = [];
-  const lightData = [];
-  const soilMoistureData = [];
-
-  sensorData.forEach((entry) => {
-    let ts = entry.timestamp;
-    if (ts && typeof ts === "string") {
-      ts = new Date(ts);
-    } else {
-      ts = new Date(0);
+  // Helper to fill-forward numeric data for a given field
+  const fillForward = (docs, field) => {
+    const sorted = [...docs].sort(
+      (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+    );
+    const result = [];
+    let idx = 0;
+    let lastVal = null;
+    for (const ts of unionTimestamps) {
+      while (idx < sorted.length && new Date(sorted[idx].timestamp) <= ts) {
+        if (sorted[idx][field] !== undefined) {
+          const val = parseFloat(sorted[idx][field]);
+          if (!isNaN(val)) lastVal = val;
+        }
+        idx++;
+      }
+      result.push(lastVal);
     }
-
-    const label =
-      ts.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }) +
-      " " +
-      ts.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-    timestamps.push(label);
-    humidityData.push(entry.humidity);
-    temperatureData.push(entry.temperature);
-    soilMoistureData.push(entry.soilMoisture);
-    lightData.push(entry.light);
-  });
-
-  // Define colors
-  const fieldColors = {
-    humidity: "rgba(54, 162, 235, 1)",
-    temperature: "rgba(255, 99, 132, 1)",
-    light: "rgba(255, 206, 86, 1)",
-    soilMoisture: "rgba(75, 192, 192, 1)",
+    return result;
   };
 
-  // Build chartData
-  let chartData;
-  if (selectedField === "all") {
-    chartData = {
-      labels: timestamps,
-      datasets: [
-        {
-          label: "Humidity (%)",
-          data: humidityData,
-          borderColor: fieldColors.humidity,
-          borderWidth: 2,
-          fill: false,
-        },
-        {
-          label: "Temperature (°C)",
-          data: temperatureData,
-          borderColor: fieldColors.temperature,
-          borderWidth: 2,
-          fill: false,
-        },
-        {
-          label: "Light (lux)",
-          data: lightData,
-          borderColor: fieldColors.light,
-          borderWidth: 2,
-          fill: false,
-        },
-        {
-          label: "Soil Moisture (%)",
-          data: soilMoistureData,
-          borderColor: fieldColors.soilMoisture,
-          borderWidth: 2,
-          fill: false,
-        },
-      ],
-    };
-  } else {
-    let labelName = "";
-    let dataArr = [];
-    let color = fieldColors.humidity;
+  // Pre-build data arrays for all possible numeric fields
+  const temperatureData = fillForward(gsmDocs, "temperature");
+  const humidityData = fillForward(gsmDocs, "humidity");
+  const soilMoistureData = fillForward(gsmDocs, "soilMoisture");
+  const light1Data = fillForward(hpcbDocs, "light1");
+  const light2Data = fillForward(hpcbDocs, "light2");
+  const light3Data = fillForward(hpcbDocs, "light3");
+  const waterLevelData = fillForward(nscbDocs, "waterLevel");
+  const nutrient1Data = fillForward(nscbDocs, "nutrient1");
+  const nutrient2Data = fillForward(nscbDocs, "nutrient2");
 
-    if (selectedField === "humidity") {
-      labelName = "Humidity (%)";
-      dataArr = humidityData;
-      color = fieldColors.humidity;
-    } else if (selectedField === "temperature") {
-      labelName = "Temperature (°C)";
-      dataArr = temperatureData;
-      color = fieldColors.temperature;
-    } else if (selectedField === "light") {
-      labelName = "Light (lux)";
-      dataArr = lightData;
-      color = fieldColors.light;
-    } else {
-      labelName = "Soil Moisture (%)";
-      dataArr = soilMoistureData;
-      color = fieldColors.soilMoisture;
-    }
+  // Make a lookup so we can easily retrieve the correct array
+  const allFieldDataMap = {
+    temperature: temperatureData,
+    humidity: humidityData,
+    soilMoisture: soilMoistureData,
+    light1: light1Data,
+    light2: light2Data,
+    light3: light3Data,
+    waterLevel: waterLevelData,
+    nutrient1: nutrient1Data,
+    nutrient2: nutrient2Data,
+  };
 
-    chartData = {
-      labels: timestamps,
-      datasets: [
-        {
-          label: labelName,
-          data: dataArr,
-          borderColor: color,
-          borderWidth: 2,
-          fill: false,
-        },
-      ],
-    };
+  const fieldColors = {
+    temperature: "rgba(255, 99, 132, 1)",
+    humidity: "rgba(54, 162, 235, 1)",
+    soilMoisture: "rgba(75, 192, 192, 1)",
+    light1: "rgba(255, 206, 86, 1)",
+    light2: "rgba(255, 159, 64, 1)",
+    light3: "rgba(153, 102, 255, 1)",
+    waterLevel: "rgba(255, 99, 255, 1)",
+    nutrient1: "rgba(40, 180, 100, 1)",
+    nutrient2: "rgba(150, 70, 190, 1)",
+  };
+
+  // Build "datasets" depending on selectedSensor
+  let chartDatasets = [];
+
+  if (selectedSensor === "allSensors") {
+    // One line for each numeric sensor that is active
+    chartDatasets = numericSensors.map((sensorName) => {
+      const fieldName = numericFieldMap[sensorName];
+      return {
+        label: sensorName,
+        data: allFieldDataMap[fieldName],
+        borderColor: fieldColors[fieldName] || "#fff",
+        borderWidth: 2,
+        fill: false,
+      };
+    });
+  } else if (selectedSensor) {
+    // Single line
+    const fieldName = numericFieldMap[selectedSensor];
+    chartDatasets = [
+      {
+        label: selectedSensor,
+        data: allFieldDataMap[fieldName],
+        borderColor: fieldColors[fieldName] || "#fff",
+        borderWidth: 2,
+        fill: false,
+      },
+    ];
   }
+
+  const labels = unionTimestamps.map((ts) =>
+    ts.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }) +
+    " " +
+    ts.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+  );
+
+  const chartData = {
+    labels,
+    datasets: chartDatasets,
+  };
 
   const chartOptions = {
     responsive: true,
     plugins: {
-      legend: {
-        labels: {
-          color: "#ffffff",
-        },
-      },
-      tooltip: {
-        enabled: true,
-        mode: "nearest",
-        intersect: false,
-        backgroundColor: "rgba(0,0,0,0.8)",
-      },
-    },
-    hover: {
-      mode: "nearest",
-      intersect: false,
+      legend: { labels: { color: "#ffffff" } },
     },
     scales: {
-      x: {
-        ticks: {
-          color: "#ffffff",
-          maxRotation: 45,
-          minRotation: 45,
-        },
-      },
-      y: {
-        ticks: {
-          color: "#ffffff",
-        },
-      },
+      x: { ticks: { color: "#ffffff" } },
+      y: { ticks: { color: "#ffffff" } },
     },
   };
 
   return (
     <div className={styles.content}>
-      <h2>Sensor Data Over Time</h2>
+      <h2>Sensor Data Graph</h2>
+      <div style={{ marginBottom: "1rem" }}>
+        <label>Select Variable to Graph: </label>
+        <select
+          value={selectedSensor}
+          onChange={(e) => setSelectedSensor(e.target.value)}
+        >
+          <option value="allSensors">All Variables</option>
+          {numericSensors.map((sensorName) => (
+            <option key={sensorName} value={sensorName}>
+              {sensorName}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className={styles.graphPanel}>
-        <label>Select Data Type: </label>
-        <select
-          value={selectedField}
-          onChange={(e) => setSelectedField(e.target.value)}
-        >
-          <option value="all">Show All</option>
-          <option value="humidity">Humidity (%)</option>
-          <option value="temperature">Temperature (°C)</option>
-          <option value="light">Light (lux)</option>
-          <option value="soilMoisture">Soil Moisture (%)</option>
-        </select>
-
         <div className={styles.graphContainer}>
-          <Line data={chartData} options={chartOptions} />
+          {unionTimestamps.length === 0 ? (
+            <p>No data available for this instance.</p>
+          ) : chartDatasets.length === 0 ? (
+            <p>Please select a sensor above to see its graph.</p>
+          ) : (
+            <Line data={chartData} options={chartOptions} />
+          )}
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default Graph;
